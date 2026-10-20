@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">SSH-one</title>
+  <desc id="desc">SSH and VPN all-in-one installer with Cloudflare DNS and UDP Custom</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#10192f"/>
+      <stop offset="0.58" stop-color="#172d4e"/>
+      <stop offset="1" stop-color="#0e4c60"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#52e0c4"/>
+      <stop offset="1" stop-color="#78a8ff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="34" height="34" patternUnits="userSpaceOnUse">
+      <path d="M34 0H0V34" fill="none" stroke="#b9dcff" stroke-opacity=".07" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="360" rx="28" fill="url(#bg)"/>
+  <rect width="1200" height="360" rx="28" fill="url(#grid)"/>
+  <circle cx="1010" cy="95" r="82" fill="#55ddc1" fill-opacity=".08"/>
+  <circle cx="1052" cy="242" r="112" fill="#79a8ff" fill-opacity=".08"/>
+  <g fill="none" stroke="url(#accent)" stroke-width="2" opacity=".82">
+    <path d="M832 181h73l35-47h86m-194 94h73l35 47h86"/>
+    <path d="M1026 134h55m-55 94h55"/>
+    <circle cx="832" cy="181" r="7" fill="#52e0c4"/>
+    <circle cx="1026" cy="134" r="7" fill="#78a8ff"/>
+    <circle cx="1026" cy="228" r="7" fill="#52e0c4"/>
+    <circle cx="1081" cy="134" r="7" fill="#78a8ff"/>
+    <circle cx="1081" cy="228" r="7" fill="#78a8ff"/>
+  </g>
+  <g filter="url(#glow)" opacity=".85">
+    <circle cx="833" cy="181" r="22" fill="#52e0c4" fill-opacity=".16"/>
+  </g>
+  <rect x="68" y="61" width="114" height="32" rx="16" fill="#ffffff" fill-opacity=".1" stroke="#ffffff" stroke-opacity=".18"/>
+  <text x="125" y="82" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="13" font-weight="700" letter-spacing="2.2" fill="#b6d9ff">VPS TOOLKIT</text>
+  <text x="64" y="181" font-family="Segoe UI,Arial,sans-serif" font-size="76" font-weight="750" letter-spacing="-3" fill="#ffffff">SSH-one</text>
+  <rect x="67" y="207" width="262" height="5" rx="2.5" fill="url(#accent)"/>
+  <text x="68" y="252" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="600" fill="#dbeaff">SSH · VPN · WebSocket · Xray</text>
+  <text x="68" y="292" font-family="Segoe UI,Arial,sans-serif" font-size="17" fill="#a9c1dd">Cloudflare DNS setup  •  UDP Custom 1–65535</text>
+  <text x="1133" y="324" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="12" letter-spacing="1.6" fill="#b4cce5" opacity=".8">ONE SCRIPT · MULTIPLE SERVICES</text>
+</svg>
