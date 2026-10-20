@@ -1,0 +1,685 @@
+#!/bin/bash
+
+SSH_ONE_REPO_CONFIG=${SSH_ONE_REPO_CONFIG:-/etc/ssh-one/repository.conf}
+if [ -r "$SSH_ONE_REPO_CONFIG" ]; then . "$SSH_ONE_REPO_CONFIG"; fi
+# ==========================================
+# Color
+RED='\033[0;31m'
+NC='\033[0m'
+GREEN='\033[0;32m'
+ORANGE='\033[0;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+LIGHT='\033[0;37m'
+# ==========================================
+# Getting
+MYIP=$(wget -qO- ipinfo.io/ip);
+MYIP=$(curl -s ipinfo.io/ip )
+MYIP=$(curl -sS ipv4.icanhazip.com)
+MYIP=$(curl -sS ifconfig.me )
+# ==================================================
+# Link Hosting Kalian
+akbarvpn="${SSH_ONE_RAW_HOST}/ssh"
+
+# Link Hosting Kalian Untuk Xray
+akbarvpnn="${SSH_ONE_RAW_HOST}/xray"
+
+# Link Hosting Kalian Untuk Trojan Go
+akbarvpnnn="${SSH_ONE_RAW_HOST}/trojango"
+
+# Link Hosting Kalian Untuk Stunnel5
+akbarvpnnnn="${SSH_ONE_RAW_HOST}/stunnel5"
+
+# initializing var
+export DEBIAN_FRONTEND=noninteractive
+MYIP=$(wget -qO- ipinfo.io/ip);
+MYIP2="s/xxxxxxxxx/$MYIP/g";
+NET=$(ip -o $ANU -4 route show to default | awk '{print $5}');
+source /etc/os-release
+ver=$VERSION_ID
+
+#detail nama perusahaan
+country=MY
+state=Kuala_Lumpur
+locality=Kuala_Lumpur
+organization=none
+organizationalunit=none
+commonname=localhost
+email=nevermoressh@gmail.com
+
+# Keep the system's PAM policy. The previous installer overwrote this file
+# with a downloaded copy, which could break password changes on some images.
+
+# go to root
+cd
+
+# Edit file /etc/systemd/system/rc-local.service
+cat > /etc/systemd/system/rc-local.service <<-END
+[Unit]
+Description=/etc/rc.local
+ConditionPathExists=/etc/rc.local
+[Service]
+Type=forking
+ExecStart=/etc/rc.local start
+TimeoutSec=0
+StandardOutput=tty
+RemainAfterExit=yes
+SysVStartPriority=99
+[Install]
+WantedBy=multi-user.target
+END
+
+# nano /etc/rc.local
+cat > /etc/rc.local <<-END
+#!/bin/sh -e
+# rc.local
+# By default this script does nothing.
+exit 0
+END
+
+# Ubah izin akses
+chmod +x /etc/rc.local
+
+# enable rc local
+systemctl enable rc-local
+systemctl start rc-local.service
+
+# Do not disable IPv6: some VPS providers expose management access over IPv6.
+
+#update
+apt update -y
+apt upgrade -y
+apt dist-upgrade -y
+apt-get remove --purge ufw firewalld -y
+apt-get remove --purge exim4 -y
+
+# install wget and curl
+apt -y install wget curl
+apt -y install net-tools
+
+# Install Requirements Tools
+apt install ruby -y
+apt install python -y
+apt install make -y
+apt install cmake -y
+apt install coreutils -y
+apt install rsyslog -y
+apt install net-tools -y
+apt install zip -y
+apt install unzip -y
+apt install nano -y
+apt install sed -y
+apt install gnupg -y
+apt install gnupg1 -y
+apt install bc -y
+apt install jq -y
+apt install apt-transport-https -y
+apt install build-essential -y
+apt install dirmngr -y
+apt install libxml-parser-perl -y
+apt install neofetch -y
+apt install git -y
+apt install lsof -y
+apt install libsqlite3-dev -y
+apt install libz-dev -y
+apt install gcc -y
+apt install g++ -y
+apt install libreadline-dev -y
+apt install zlib1g-dev -y
+apt install libssl-dev -y
+apt install dos2unix -y
+
+# set time GMT +8
+ln -fs /usr/share/zoneinfo/Asia/Kuala_Lumpur /etc/localtime
+
+# set locale
+sed -i 's/AcceptEnv/#AcceptEnv/g' /etc/ssh/sshd_config
+
+# install
+apt-get --reinstall --fix-missing install -y bzip2 gzip coreutils wget screen rsyslog iftop htop net-tools zip unzip wget net-tools curl nano sed screen gnupg gnupg1 bc apt-transport-https build-essential dirmngr libxml-parser-perl neofetch git lsof
+echo "clear" >> .profile
+echo "neofetch" >> .profile
+
+# install webserver
+apt -y install nginx php php-fpm php-cli php-mysql libxml-parser-perl
+rm /etc/nginx/sites-enabled/default
+rm /etc/nginx/sites-available/default
+curl https://${akbarvpn}/nginx.conf > /etc/nginx/nginx.conf
+curl https://${akbarvpn}/vps.conf > /etc/nginx/conf.d/vps.conf
+sed -i 's/listen = \/var\/run\/php-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/fpm/pool.d/www.conf
+useradd -m vps;
+mkdir -p /home/vps/public_html
+echo "<?php phpinfo() ?>" > /home/vps/public_html/info.php
+chown -R www-data:www-data /home/vps/public_html
+chmod -R g+rw /home/vps/public_html
+cd /home/vps/public_html
+wget -O /home/vps/public_html/index.html "https://${akbarvpn}/index.html1"
+sed -i "s|__SSH_ONE_REPO_URL__|${SSH_ONE_REPO_URL}|g" /home/vps/public_html/index.html
+/etc/init.d/nginx restart
+cd
+
+# install badvpn
+cd
+wget -O /usr/bin/badvpn-udpgw "https://${akbarvpn}/badvpn-udpgw64"
+chmod +x /usr/bin/badvpn-udpgw
+sed -i '$ i\screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7100 --max-clients 500' /etc/rc.local
+sed -i '$ i\screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7200 --max-clients 500' /etc/rc.local
+sed -i '$ i\screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 500' /etc/rc.local
+screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7100 --max-clients 500
+screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7200 --max-clients 500
+screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 500
+
+
+# Configure SSH access in the global section, before any Match blocks. Keep a
+# backup and roll back if validation, restart, or listener checks fail.
+configure_ssh_access() {
+	local config=/etc/ssh/sshd_config
+	local backup_dir=/etc/ssh-one/backups
+	local backup=/etc/ssh-one/backups/sshd_config.pre-v11
+	local temp effective setting port
+
+	if [ ! -s "$config" ]; then
+		echo "OpenSSH config is missing or empty: $config" >&2
+		return 1
+	fi
+	install -d -m 0700 "$backup_dir" || return 1
+	if [ ! -e "$backup" ]; then
+		cp -a "$config" "$backup" || return 1
+	fi
+	if ! command -v sshd >/dev/null 2>&1 || ! command -v ss >/dev/null 2>&1; then
+		echo "OpenSSH validation tools (sshd and ss) are required." >&2
+		return 1
+	fi
+	temp=$(mktemp /etc/ssh/sshd_config.ssh-one.XXXXXX) || return 1
+	{
+		cat <<'SSH_ONE_ACCESS'
+# BEGIN SSH-one managed access settings
+Port 22
+Port 2253
+PermitRootLogin yes
+PasswordAuthentication yes
+PubkeyAuthentication yes
+UsePAM yes
+# END SSH-one managed access settings
+SSH_ONE_ACCESS
+		awk '
+			/^# BEGIN SSH-one managed access settings$/ { skip=1; next }
+			/^# END SSH-one managed access settings$/ { skip=0; next }
+			!skip { print }
+		' "$config"
+	} > "$temp" || { rm -f "$temp"; return 1; }
+	chmod --reference="$config" "$temp" || { rm -f "$temp"; return 1; }
+	chown --reference="$config" "$temp" || { rm -f "$temp"; return 1; }
+	mv -f "$temp" "$config" || { rm -f "$temp"; return 1; }
+
+	if ! sshd -t -f "$config"; then
+		echo "sshd rejected the new config; restoring the original file." >&2
+		cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
+		return 1
+	fi
+	if ! systemctl restart ssh || ! systemctl is-active --quiet ssh; then
+		echo "OpenSSH did not restart cleanly; restoring the original config." >&2
+		cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
+		return 1
+	fi
+	effective=$(sshd -T -f "$config" 2>/dev/null) || {
+		echo "Could not read the effective OpenSSH settings." >&2
+		cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
+		return 1
+	}
+	for setting in 'permitrootlogin yes' 'passwordauthentication yes' 'pubkeyauthentication yes' 'port 22' 'port 2253'; do
+		if ! printf '%s\n' "$effective" | grep -Fxq "$setting"; then
+			echo "Required OpenSSH setting is not active: $setting" >&2
+			cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
+			return 1
+		fi
+	done
+	for port in 22 2253; do
+		if ! iptables -w -I INPUT 1 -p tcp --dport "$port" -j ACCEPT; then
+			echo "Could not add the host firewall allow rule for TCP port $port." >&2
+			cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
+			return 1
+		fi
+		if command -v ip6tables >/dev/null 2>&1 && ip6tables -S INPUT >/dev/null 2>&1; then
+			if ! ip6tables -w -I INPUT 1 -p tcp --dport "$port" -j ACCEPT; then
+				echo "Could not add the IPv6 host firewall allow rule for TCP port $port." >&2
+				cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
+				return 1
+			fi
+		fi
+	done
+	if ! command -v netfilter-persistent >/dev/null 2>&1 || ! netfilter-persistent save; then
+		echo "Could not persist the SSH firewall allow rules." >&2
+		cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
+		return 1
+	fi
+	for port in 22 2253; do
+		# Ignore loopback-only listeners; those cannot accept internet connections.
+		if ! ss -H -ltn | awk -v p="$port" '$4 ~ (":" p "$") && $4 !~ /^127\.0\.0\.1:/ && $4 !~ /^\[::1\]:/ && $4 !~ /^::1:/ { found=1 } END { exit !found }'; then
+			echo "OpenSSH is not listening on TCP port $port on a non-loopback address." >&2
+			cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
+			return 1
+		fi
+	done
+	echo "OpenSSH is active with root/password and key authentication on TCP 22 and 2253."
+}
+if ! configure_ssh_access; then
+	echo "SSH setup failed; stopping installation to avoid a reboot with broken access." >&2
+	exit 1
+fi
+
+# install dropbear
+apt -y install dropbear
+sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
+sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=143/g' /etc/default/dropbear
+sed -i 's/DROPBEAR_EXTRA_ARGS=/DROPBEAR_EXTRA_ARGS="-p 109 -p 1153"/g' /etc/default/dropbear
+echo "/bin/false" >> /etc/shells
+echo "/usr/sbin/nologin" >> /etc/shells
+/etc/init.d/dropbear restart
+
+# install squid (beta testing)
+#cd
+#apt -y install squid3
+#wget -O /etc/squid/squid.conf "https://${akbarvpn}/squid3.conf"
+#sed -i $MYIP2 /etc/squid/squid.conf
+
+# Install SSLH
+apt -y install resolvconf
+
+# Install SSLH
+apt -y install sslh
+rm -f /etc/default/sslh
+
+# Settings SSLH
+cat > /etc/default/sslh <<-END
+# Default options for sslh initscript
+# sourced by /etc/init.d/sslh
+
+# Disabled by default, to force yourself
+# to read the configuration:
+# - /usr/share/doc/sslh/README.Debian (quick start)
+# - /usr/share/doc/sslh/README, at "Configuration" section
+# - sslh(8) via "man sslh" for more configuration details.
+# Once configuration ready, you *must* set RUN to yes here
+# and try to start sslh (standalone mode only)
+
+RUN=yes
+
+# binary to use: forked (sslh) or single-thread (sslh-select) version
+# systemd users: don't forget to modify /lib/systemd/system/sslh.service
+DAEMON=/usr/sbin/sslh
+
+DAEMON_OPTS="--user sslh --listen 0.0.0.0:443 --ssl 127.0.0.1:777 --ssh 127.0.0.1:109 --openvpn 127.0.0.1:1194 --http 127.0.0.1:8880 --pidfile /var/run/sslh/sslh.pid -n"
+
+END
+
+# Restart Service SSLH
+service sslh restart
+systemctl restart sslh
+/etc/init.d/sslh restart
+/etc/init.d/sslh status
+/etc/init.d/sslh restart
+
+# setting vnstat
+apt -y install vnstat
+/etc/init.d/vnstat restart
+apt -y install libsqlite3-dev
+wget https://github.com/NevermoreSSH/addons/releases/download/vnstat-2.6/vnstat-2.6.tar.gz
+tar zxvf vnstat-2.6.tar.gz
+cd vnstat-2.6
+./configure --prefix=/usr --sysconfdir=/etc && make && make install
+cd
+vnstat -u -i $NET
+sed -i 's/Interface "'""eth0""'"/Interface "'""$NET""'"/g' /etc/vnstat.conf
+chown vnstat:vnstat /var/lib/vnstat -R
+systemctl enable vnstat
+/etc/init.d/vnstat restart
+rm -f /root/vnstat-2.6.tar.gz
+rm -rf /root/vnstat-2.6
+
+# install stunnel 5
+cd /root/
+wget -q -O stunnel5.zip "https://${akbarvpnnnn}/stunnel5.zip"
+unzip -o stunnel5.zip
+cd /root/stunnel
+chmod +x configure
+./configure
+make
+make install
+cd /root
+rm -r -f stunnel
+rm -f stunnel5.zip
+mkdir -p /etc/stunnel5
+chmod 644 /etc/stunnel5
+
+# Download Config Stunnel5
+cat > /etc/stunnel5/stunnel5.conf <<-END
+cert = /etc/xray/xray.crt
+key = /etc/xray/xray.key
+client = no
+socket = a:SO_REUSEADDR=1
+socket = l:TCP_NODELAY=1
+socket = r:TCP_NODELAY=1
+
+[dropbear]
+accept = 445
+connect = 127.0.0.1:109
+
+[openssh]
+accept = 777
+connect = 127.0.0.1:443
+
+[openvpn]
+accept = 990
+connect = 127.0.0.1:1194
+
+
+END
+
+# make a certificate
+#openssl genrsa -out key.pem 2048
+#openssl req -new -x509 -key key.pem -out cert.pem -days 1095 \
+#-subj "/C=$country/ST=$state/L=$locality/O=$organization/OU=$organizationalunit/CN=$commonname/emailAddress=$email"
+#cat key.pem cert.pem >> /etc/stunnel5/stunnel5.pem
+
+# Service Stunnel5 systemctl restart stunnel5
+cat > /etc/systemd/system/stunnel5.service << END
+[Unit]
+Description=Stunnel5 Service
+Documentation=https://stunnel.org
+Documentation=https://github.com/Akbar218
+After=syslog.target network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/stunnel5 /etc/stunnel5/stunnel5.conf
+Type=forking
+
+[Install]
+WantedBy=multi-user.target
+END
+
+# Service Stunnel5 /etc/init.d/stunnel5
+wget -q -O /etc/init.d/stunnel5 "https://${akbarvpnnnn}/stunnel5.init"
+
+# Ubah Izin Akses
+chmod 600 /etc/stunnel5/stunnel5.pem
+chmod +x /etc/init.d/stunnel5
+cp /usr/local/bin/stunnel /usr/local/bin/stunnel5
+
+# Remove File
+rm -r -f /usr/local/share/doc/stunnel/
+rm -r -f /usr/local/etc/stunnel/
+rm -f /usr/local/bin/stunnel
+rm -f /usr/local/bin/stunnel3
+rm -f /usr/local/bin/stunnel4
+#rm -f /usr/local/bin/stunnel5
+
+# Restart Stunnel 5
+systemctl stop stunnel5
+systemctl enable stunnel5
+systemctl start stunnel5
+systemctl restart stunnel5
+/etc/init.d/stunnel5 restart
+/etc/init.d/stunnel5 status
+/etc/init.d/stunnel5 restart
+
+#OpenVPN
+wget https://${akbarvpn}/vpn.sh &&  chmod +x vpn.sh && ./vpn.sh
+
+# install fail2ban
+apt -y install fail2ban
+
+# Instal DDOS Flate
+if [ -d '/usr/local/ddos' ]; then
+	echo; echo; echo "Please un-install the previous version first"
+	exit 0
+else
+	mkdir /usr/local/ddos
+fi
+clear
+
+# Keep the OpenSSH configuration above global; avoid appending directives after
+# a possible Match block. Dropbear continues to use /etc/issue.net below.
+sed -i 's@DROPBEAR_BANNER=""@DROPBEAR_BANNER="/etc/issue.net"@g' /etc/default/dropbear
+
+# Install BBR
+#wget https://${akbarvpn}/bbr.sh && chmod +x bbr.sh && ./bbr.sh
+
+# Ganti Banner
+wget -O /etc/issue.net "https://${akbarvpn}/issue.net"
+
+# blockir torrent
+iptables -A FORWARD -m string --string "get_peers" --algo bm -j DROP
+iptables -A FORWARD -m string --string "announce_peer" --algo bm -j DROP
+iptables -A FORWARD -m string --string "find_node" --algo bm -j DROP
+iptables -A FORWARD -m string --algo bm --string "BitTorrent" -j DROP
+iptables -A FORWARD -m string --algo bm --string "BitTorrent protocol" -j DROP
+iptables -A FORWARD -m string --algo bm --string "peer_id=" -j DROP
+iptables -A FORWARD -m string --algo bm --string ".torrent" -j DROP
+iptables -A FORWARD -m string --algo bm --string "announce.php?passkey=" -j DROP
+iptables -A FORWARD -m string --algo bm --string "torrent" -j DROP
+iptables -A FORWARD -m string --algo bm --string "announce" -j DROP
+iptables -A FORWARD -m string --algo bm --string "info_hash" -j DROP
+iptables-save > /etc/iptables.up.rules
+iptables-restore -t < /etc/iptables.up.rules
+netfilter-persistent save
+netfilter-persistent reload
+
+# download script
+cd /usr/bin
+wget -O addhost "https://${akbarvpn}/addhost.sh"
+wget -O slhost "https://${akbarvpn}/slhost.sh"
+wget -O dns "https://${akbarvpn}/dns.sh"
+wget -O netf "https://${akbarvpn}/netf.sh"
+wget -O bbr2 "https://${akbarvpn}/bbr2.sh"
+wget -O about "https://${akbarvpn}/about.sh"
+wget -O menu "${SSH_ONE_RAW_BASE}/update/menu.sh"
+wget -O ssh-one-udp "${SSH_ONE_RAW_BASE}/update/udp-menu.sh"
+wget -O addssh "https://${akbarvpn}/addssh.sh"
+wget -O trialssh "https://${akbarvpn}/trialssh.sh"
+wget -O delssh "https://${akbarvpn}/delssh.sh"
+wget -O member "https://${akbarvpn}/member.sh"
+wget -O delexp "https://${akbarvpn}/delexp.sh"
+wget -O cekssh "https://${akbarvpn}/cekssh.sh"
+wget -O restart "https://${akbarvpn}/restart.sh"
+wget -O speedtest "https://${akbarvpn}/speedtest_cli.py"
+wget -O info "https://${akbarvpn}/info.sh"
+wget -O ram "https://${akbarvpn}/ram.sh"
+wget -O renewssh "https://${akbarvpn}/renewssh.sh"
+wget -O autokill "https://${akbarvpn}/autokill.sh"
+wget -O ceklim "https://${akbarvpn}/ceklim.sh"
+wget -O tendang "https://${akbarvpn}/tendang.sh"
+wget -O clearlog "https://${akbarvpn}/clearlog.sh"
+wget -O changeport "https://${akbarvpn}/changeport.sh"
+wget -O portovpn "https://${akbarvpn}/portovpn.sh"
+wget -O portwg "https://${akbarvpn}/portwg.sh"
+wget -O porttrojan "https://${akbarvpn}/porttrojan.sh"
+wget -O portsstp "https://${akbarvpn}/portsstp.sh"
+wget -O portsquid "https://${akbarvpn}/portsquid.sh"
+wget -O portvlm "https://${akbarvpn}/portvlm.sh"
+wget -O wbmn "https://${akbarvpn}/webmin.sh"
+wget -O xp "https://${akbarvpn}/xp.sh"
+wget -O swapkvm "https://${akbarvpn}/swapkvm.sh"
+wget -O addvmess "https://${akbarvpnn}/addv2ray.sh"
+wget -O addvless "https://${akbarvpnn}/addvless.sh"
+wget -O addtrojan "https://${akbarvpnn}/addtrojan.sh"
+wget -O addgrpc "https://${akbarvpnn}/addgrpc.sh"
+wget -O cekgrpc "https://${akbarvpnn}/cekgrpc.sh"
+wget -O delgrpc "https://${akbarvpnn}/delgrpc.sh"
+wget -O renewgrpc "https://${akbarvpnn}/renewgrpc.sh"
+wget -O delvmess "https://${akbarvpnn}/delv2ray.sh"
+wget -O delvless "https://${akbarvpnn}/delvless.sh"
+wget -O deltrojan "https://${akbarvpnn}/deltrojan.sh"
+wget -O cekvmess "https://${akbarvpnn}/cekv2ray.sh"
+wget -O cekvless "https://${akbarvpnn}/cekvless.sh"
+wget -O cektrojan "https://${akbarvpnn}/cektrojan.sh"
+wget -O renewvmess "https://${akbarvpnn}/renewv2ray.sh"
+wget -O renewvless "https://${akbarvpnn}/renewvless.sh"
+wget -O renewtrojan "https://${akbarvpnn}/renewtrojan.sh"
+wget -O certv2ray "https://${akbarvpnn}/certv2ray.sh"
+wget -O addtrgo "https://${akbarvpnnn}/addtrgo.sh"
+wget -O deltrgo "https://${akbarvpnnn}/deltrgo.sh"
+wget -O renewtrgo "https://${akbarvpnnn}/renewtrgo.sh"
+wget -O cektrgo "https://${akbarvpnnn}/cektrgo.sh"
+wget -O portsshnontls "${SSH_ONE_RAW_BASE}/websocket/portsshnontls.sh"
+wget -O portsshws "${SSH_ONE_RAW_BASE}/websocket/portsshws.sh"
+wget -O userv2ray "https://${akbarvpnn}/userv2ray.sh"
+wget -O uservless "https://${akbarvpnn}/uservless.sh"
+
+wget -O ipsaya "${SSH_ONE_RAW_BASE}/update/ipsaya.sh"
+wget -O sshovpnmenu "${SSH_ONE_RAW_BASE}/update/sshovpn.sh"
+wget -O l2tpmenu "${SSH_ONE_RAW_BASE}/update/l2tpmenu.sh"
+wget -O pptpmenu "${SSH_ONE_RAW_BASE}/update/pptpmenu.sh"
+wget -O sstpmenu "${SSH_ONE_RAW_BASE}/update/sstpmenu.sh"
+wget -O wgmenu "${SSH_ONE_RAW_BASE}/update/wgmenu.sh"
+wget -O ssmenu "${SSH_ONE_RAW_BASE}/update/ssmenu.sh"
+wget -O ssrmenu "${SSH_ONE_RAW_BASE}/update/ssrmenu.sh"
+wget -O vmessmenu "${SSH_ONE_RAW_BASE}/update/vmessmenu.sh"
+wget -O vlessmenu "${SSH_ONE_RAW_BASE}/update/vlessmenu.sh"
+wget -O grpcmenu "${SSH_ONE_RAW_BASE}/update/grpcmenu.sh"
+wget -O grpcupdate "${SSH_ONE_RAW_BASE}/update/grpcupdate.sh"
+wget -O trmenu "${SSH_ONE_RAW_BASE}/update/trmenu.sh"
+wget -O trgomenu "${SSH_ONE_RAW_BASE}/update/trgomenu.sh"
+wget -O setmenu "${SSH_ONE_RAW_BASE}/update/setmenu.sh"
+wget -O slowdnsmenu "${SSH_ONE_RAW_BASE}/update/slowdnsmenu.sh"
+wget -O running "${SSH_ONE_RAW_BASE}/update/running.sh"
+wget -O updatemenu "${SSH_ONE_RAW_BASE}/update/updatemenu.sh"
+wget -O sl-fix "${SSH_ONE_RAW_BASE}/sslh-fix/sl-fix"
+wget -O install-sldns "${SSH_ONE_RAW_BASE}/SLDNS/install-sldns"
+wget -O fssw "${SSH_ONE_RAW_BASE}/fssw/fssw.sh"
+
+chmod +x sl-fix
+chmod +x fssw
+chmod +x install-sldns
+chmod +x ipsaya
+chmod +x sshovpnmenu
+chmod +x l2tpmenu
+chmod +x pptpmenu
+chmod +x sstpmenu
+chmod +x wgmenu
+chmod +x ssmenu
+chmod +x ssrmenu
+chmod +x vmessmenu
+chmod +x vlessmenu
+chmod +x grpcmenu
+chmod +x grpcupdate
+chmod +x trmenu
+chmod +x trgomenu
+chmod +x setmenu
+chmod +x slowdnsmenu
+chmod +x running
+chmod +x updatemenu
+
+
+chmod +x portsshnontls
+chmod +x portsshws
+
+chmod +x slhost
+chmod +x addhost
+chmod +x dns
+chmod +x netf
+chmod +x bbr2
+chmod +x menu
+chmod +x ssh-one-udp
+chmod +x addssh
+chmod +x trialssh
+chmod +x delssh
+chmod +x member
+chmod +x delexp
+chmod +x cekssh
+chmod +x restart
+chmod +x speedtest
+chmod +x info
+chmod +x about
+chmod +x autokill
+chmod +x tendang
+chmod +x ceklim
+chmod +x ram
+chmod +x renewssh
+chmod +x clearlog
+chmod +x changeport
+chmod +x portovpn
+chmod +x portwg
+chmod +x porttrojan
+chmod +x portsstp
+chmod +x portsquid
+chmod +x portvlm
+chmod +x wbmn
+chmod +x xp
+chmod +x swapkvm
+chmod +x addvmess
+chmod +x addvless
+chmod +x addtrojan
+chmod +x addgrpc
+chmod +x delgrpc
+chmod +x delvmess
+chmod +x delvless
+chmod +x deltrojan
+chmod +x cekgrpc
+chmod +x cekvmess
+chmod +x cekvless
+chmod +x cektrojan
+chmod +x renewgrpc
+chmod +x renewvmess
+chmod +x renewvless
+chmod +x renewtrojan
+chmod +x certv2ray
+chmod +x addtrgo
+chmod +x deltrgo
+chmod +x renewtrgo
+chmod +x cektrgo
+chmod +x userv2ray
+chmod +x uservless
+#echo "0 5 * * * root clearlog && reboot" >> /etc/crontab
+echo "5 1 * * * root delexp && xp && restart" >> /etc/crontab
+echo "5 4 * * * root clearlog && sslh-fix-reboot" >> /etc/crontab
+echo "0 0 * * * root clearlog" >> /etc/crontab
+echo "0 1 * * * root delexp" >> /etc/crontab
+echo "0 2 * * * root xp" >> /etc/crontab
+echo "0 3 * * * root restart" >> /etc/crontab
+echo "0 4 * * * root sslh-fix-reboot" >> /etc/crontab
+echo "0 5 * * * root reboot" >> /etc/crontab
+echo "0 6 * * * root backup" >> /etc/crontab
+echo "0 23 * * * root backup" >> /etc/crontab
+echo "5 1 * * * root /usr/bin/delexp" >> /etc/crontab
+echo "5 2 * * * root /usr/bin/xp" >> /etc/crontab
+echo "5 23 * * * root /usr/bin/backup" >> /etc/crontab
+#echo "1 * * * * root systemctl restart server-sldns" >> /etc/crontab
+
+# remove unnecessary files
+cd
+apt autoclean -y
+apt -y remove --purge unscd
+apt-get -y --purge remove samba*;
+apt-get -y --purge remove apache2*;
+apt-get -y --purge remove bind9*;
+apt-get -y remove sendmail*
+apt autoremove -y
+# finishing
+cd
+chown -R www-data:www-data /home/vps/public_html
+/etc/init.d/nginx restart
+/etc/init.d/openvpn restart
+/etc/init.d/cron restart
+/etc/init.d/ssh restart
+/etc/init.d/dropbear restart
+/etc/init.d/fail2ban restart
+/etc/init.d/sslh restart
+/etc/init.d/stunnel5 restart
+/etc/init.d/vnstat restart
+/etc/init.d/fail2ban restart
+/etc/init.d/squid restart
+screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7100 --max-clients 500
+screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7200 --max-clients 500
+screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 500
+history -c
+echo "unset HISTFILE" >> /etc/profile
+
+cd
+rm -f /root/key.pem
+rm -f /root/cert.pem
+rm -f /root/ssh-vpn.sh
+
+# finihsing
+clear
