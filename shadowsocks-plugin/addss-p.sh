@@ -1,5 +1,4 @@
 #!/bin/bash
-# By NevermoreSSH
 # ==========================================
 # Color
 RED='\033[0;31m'
@@ -766,4 +765,4 @@ echo -e "Link Aplikasi gost-plugin: #://$MYIP:89/gost-plugin-arm.zip"
 echo -e "Link Aplikasi xray-plugin: #://$MYIP:89/v2ray-plugin-universal.apk"
 echo -e "ganti tanda # menjadi http"
 echo -e "========================="
-echo -e "Script Mod By NevermoreSSH"
+echo -e "Script Mod"

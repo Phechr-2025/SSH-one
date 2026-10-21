@@ -46,7 +46,7 @@ locality=Kuala_Lumpur
 organization=none
 organizationalunit=none
 commonname=localhost
-email=nevermoressh@gmail.com
+email=admin@example.invalid
 
 # Keep the system's PAM policy. The previous installer overwrote this file
 # with a downloaded copy, which could break password changes on some images.

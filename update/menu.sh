@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Keep optional statistics tools from delaying or hiding the menu.
-MENU_VERSION='v18'
+MENU_VERSION='v19'
 
 if [[ ${1:-} == --check ]]; then
   printf 'SSH-one menu %s is ready.\n' "$MENU_VERSION"

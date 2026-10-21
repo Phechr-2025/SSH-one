@@ -2,7 +2,6 @@
 
 SSH_ONE_REPO_CONFIG=${SSH_ONE_REPO_CONFIG:-/etc/ssh-one/repository.conf}
 if [ -r "$SSH_ONE_REPO_CONFIG" ]; then . "$SSH_ONE_REPO_CONFIG"; fi
-# By NevermoreSSH
 # ==========================================
 # Color
 RED='\033[0;31m'
@@ -113,4 +112,4 @@ echo -e "Link TLS    : ${xrayvless1}"
 echo -e "========================="
 echo -e "Link No TLS : ${xrayvless2}"
 echo -e "========================="
-echo -e "Script Mod By NevermoreSSH"
+echo -e "Script Mod"

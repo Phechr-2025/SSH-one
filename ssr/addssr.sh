@@ -1,5 +1,4 @@
 #!/bin/bash
-# By NevermoreSSH
 # ==========================================
 # Color
 RED='\033[0;31m'
@@ -84,4 +83,4 @@ echo -e "Expired     : ${exp} "
 echo -e "=========================="
 echo -e "Link SSR    : ${ssr_link}"
 echo -e "=========================="
-echo -e "Script Mod By NevermoreSSH"
+echo -e "Script Mod"

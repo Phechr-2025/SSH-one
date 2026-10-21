@@ -3,7 +3,6 @@
 SSH_ONE_REPO_CONFIG=${SSH_ONE_REPO_CONFIG:-/etc/ssh-one/repository.conf}
 if [ -r "$SSH_ONE_REPO_CONFIG" ]; then . "$SSH_ONE_REPO_CONFIG"; fi
 # Proxy For Edukasi & Imclass
-# By NevermoreSSH
 # ==========================================
 
 # Link Hosting Kalian
@@ -44,7 +43,7 @@ chmod +x /usr/local/bin/ws-ovpn
 # Installing Service
 cat > /etc/systemd/system/ws-ovpn.service << END
 [Unit]
-Description=Python Proxy Mod By nevermoressh
+Description=Python Proxy Mod
 Documentation=https://nekopoi.care
 After=network.target nss-lookup.target
 

@@ -106,7 +106,7 @@ Payload Websocket HTTP
 ==============================
 GET / HTTP/1.1[crlf]Host: [host][crlf]Upgrade: websocket[crlf][crlf]
 ==============================
-Script Mod By NevermoreSSH
+Script Mod
 
 END
 
@@ -152,4 +152,4 @@ echo -e "Payload Websocket HTTP"
 echo -e "=============================="
 echo -e "GET / HTTP/1.1[crlf]Host: [host][crlf]Upgrade: websocket[crlf][crlf]"
 echo -e "=============================="
-echo -e "Script Mod By NevermoreSSH"
+echo -e "Script Mod"

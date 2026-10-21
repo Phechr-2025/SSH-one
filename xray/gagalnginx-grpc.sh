@@ -1,5 +1,4 @@
 #!/bin/bash
-# Mod By NevermoreSSH
 # =====================================================
 source /var/lib/crot/ipvps.conf
 if [[ "$IP" = "" ]]; then

@@ -2,7 +2,6 @@
 
 SSH_ONE_REPO_CONFIG=${SSH_ONE_REPO_CONFIG:-/etc/ssh-one/repository.conf}
 if [ -r "$SSH_ONE_REPO_CONFIG" ]; then . "$SSH_ONE_REPO_CONFIG"; fi
-# By NevermoreSSH
 # ==========================================
 # Color
 RED='\033[0;31m'
@@ -25,7 +24,6 @@ echo -e "${NC}${RED}Permission Denied!${NC}";
 echo -e "${NC}${LIGHT}Fuck You!!"
 exit 0
 fi
-# Mod By NevermoreSSH
 # ==================================================
 # Link Hosting Kalian
 akbarvpn="${SSH_ONE_RAW_HOST}/ssh"

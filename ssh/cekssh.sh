@@ -1,5 +1,4 @@
 #!/bin/bash
-# By NevermoreSSH
 # ==========================================
 # Color
 RED='\033[0;31m'
@@ -83,6 +82,6 @@ echo "----------------------------------------------";
         cat /tmp/vpn-login-udp.txt
 fi
 echo "----------------------------------------------";
-echo "Script Mod By NevermoreSSH"
+echo "Script Mod"
 echo "";
 

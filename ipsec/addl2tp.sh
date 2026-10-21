@@ -1,5 +1,4 @@
 #!/bin/bash
-# By NevermoreSSH
 # ==========================================
 # Color
 RED='\033[0;31m'
@@ -76,5 +75,5 @@ Password   : $VPN_PASSWORD
 Created    : $hariini
 Expired    : $exp
 ============================
-Script Mod By NevermoreSSH
+Script Mod
 EOF

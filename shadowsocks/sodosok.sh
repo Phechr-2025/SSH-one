@@ -2,7 +2,6 @@
 
 SSH_ONE_REPO_CONFIG=${SSH_ONE_REPO_CONFIG:-/etc/ssh-one/repository.conf}
 if [ -r "$SSH_ONE_REPO_CONFIG" ]; then . "$SSH_ONE_REPO_CONFIG"; fi
-#shadowsocks-libev obfs install By NevermoreSSH
 # ==========================================
 # Color
 RED='\033[0;31m'

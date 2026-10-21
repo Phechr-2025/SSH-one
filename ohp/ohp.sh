@@ -1,6 +1,5 @@
 #!/bin/bash
 # Open Http Puncher
-# By NevermoreSSH
 # ==========================================
 # Color
 RED='\033[0;31m'

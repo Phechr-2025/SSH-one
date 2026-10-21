@@ -3,7 +3,6 @@
 SSH_ONE_REPO_CONFIG=${SSH_ONE_REPO_CONFIG:-/etc/ssh-one/repository.conf}
 if [ -r "$SSH_ONE_REPO_CONFIG" ]; then . "$SSH_ONE_REPO_CONFIG"; fi
 # XRay Installation
-# By NevermoreSSH Script
 # ==================================
 MYIP=$(wget -qO- ipinfo.io/ip);
 clear
@@ -331,7 +330,7 @@ END
 systemctl daemon-reload
 cat > /etc/systemd/system/xtls-xray.service << END
 [Unit]
-Description=XTLS Xray Service Create By NevermoreSSH
+Description=XTLS Xray Service Create
 Documentation=https://nekopoi.care
 After=network.target nss-lookup.target
 

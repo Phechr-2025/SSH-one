@@ -2,7 +2,6 @@
 
 SSH_ONE_REPO_CONFIG=${SSH_ONE_REPO_CONFIG:-/etc/ssh-one/repository.conf}
 if [ -r "$SSH_ONE_REPO_CONFIG" ]; then . "$SSH_ONE_REPO_CONFIG"; fi
-# Mod By NevermoreSSH
 # =====================================================
 
 # Color
@@ -376,7 +375,7 @@ fi
 # / / Installation Xray Service
 cat > /etc/systemd/system/xray.service << END
 [Unit]
-Description=Xray Service Mod By NevermoreSSH
+Description=Xray Service Mod
 Documentation=https://nekopoi.care
 After=network.target nss-lookup.target
 
@@ -504,7 +503,7 @@ END
 # Installing Trojan Go Service
 cat > /etc/systemd/system/trojan-go.service << END
 [Unit]
-Description=Trojan-Go Service Mod By NevermoreSSH
+Description=Trojan-Go Service Mod
 Documentation=nekopoi.care
 After=network.target nss-lookup.target
 

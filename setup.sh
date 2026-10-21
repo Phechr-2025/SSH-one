@@ -63,7 +63,7 @@ if ! install -d -m 0755 /etc/ssh-one; then
 	report_error "Could not create the SSH-one state directory."
 	exit 1
 fi
-if ! printf 'v18 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
+if ! printf 'v19 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
 	report_error "Could not write the installation-in-progress marker."
 	exit 1
 fi
@@ -75,11 +75,13 @@ backup_preexisting_paths() {
 	local manifest="$SSH_ONE_SOURCE_ROOT/update/managed-files.tsv"
 	local command_backup=/etc/ssh-one/backups/managed-bin
 	local runtime_backup=/etc/ssh-one/backups/runtime
+	local preexisting_tmp="$command_backup/.preexisting-managed-bin.tsv.new"
 	if [[ ! -r "$manifest" ]]; then
 		report_error "Managed-file manifest is missing: $manifest"
 		return 1
 	fi
 	install -d -m 0700 "$command_backup" "$runtime_backup" || return 1
+	: > "$preexisting_tmp" || { report_error "Could not prepare the pre-install command list."; return 1; }
 	while IFS=$'\t' read -r source target _; do
 		[[ -n "$source" && "$source" != \#* ]] || continue
 		[[ "$target" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]] || { report_error "Invalid target in managed-file manifest: $target"; return 1; }
@@ -89,11 +91,13 @@ backup_preexisting_paths() {
 			return 1
 		elif [[ -f "$path" ]]; then
 			cp -a -- "$path" "$command_backup/$target" || { report_error "Could not preserve pre-existing command $path"; return 1; }
+			printf '%s\n' "$target" >> "$preexisting_tmp" || { report_error "Could not record pre-existing command $path"; return 1; }
 		elif [[ -e "$path" ]]; then
 			report_error "A non-file already uses the command path $path. Resolve this collision before installing."
 			return 1
 		fi
 	done < "$manifest"
+	mv -fT -- "$preexisting_tmp" "$command_backup/preexisting-managed-bin.tsv" || { report_error "Could not save the pre-install command list."; return 1; }
 	for path in /usr/local/bin/xray /usr/local/bin/trojan-go /usr/local/bin/ws-tls /usr/local/bin/ws-nontls /usr/local/bin/ws-ovpn /usr/local/bin/ohpserver /bin/udpgw /root/udp/udp-custom; do
 		if [[ -L "$path" ]]; then
 			report_error "A symbolic link already uses the runtime path $path. Resolve this collision before installing."
@@ -321,8 +325,9 @@ if passwd -S root 2>/dev/null | awk '$2 == "L" || $2 == "NP" { locked=1 } END { 
 	report_error "Warning: root has no usable password; password login cannot work until you set one in the VPS console. SSH key access may still work."
 fi
 
+printf 'v19\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
+mv -fT -- /etc/ssh-one/.installation-complete.new /etc/ssh-one/installation-complete || { report_error "Could not activate the installation marker."; exit 1; }
 rm -f /etc/ssh-one/install-in-progress || { report_error "Could not remove the installation-in-progress marker."; exit 1; }
-printf 'v18\n' > /etc/ssh-one/installation-complete || { report_error "Could not write the installation marker."; exit 1; }
 printf 'Installation complete. SSH config and TCP 22/2253 listeners passed checks. VPS will reboot in 10 seconds.\n' | tee -a /root/log-install.txt
 for remaining in {10..1}; do
 	printf '\rRestarting VPS in %2d seconds...' "$remaining"

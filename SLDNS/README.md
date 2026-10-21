@@ -1,6 +1,5 @@
-# By NevermoreSSHDNS
-SSH OVER DNS create By NevermoreSSH
-* Link Script Repo SlowDNS dari NevermoreSSH
+SSH OVER DNS create
+* Link Script Repo SlowDNS dari SSH-one
 ```html
 ${SSH_ONE_REPO_URL}
 ```

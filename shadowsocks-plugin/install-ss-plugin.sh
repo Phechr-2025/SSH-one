@@ -2,7 +2,6 @@
 
 SSH_ONE_REPO_CONFIG=${SSH_ONE_REPO_CONFIG:-/etc/ssh-one/repository.conf}
 if [ -r "$SSH_ONE_REPO_CONFIG" ]; then . "$SSH_ONE_REPO_CONFIG"; fi
-# Mod By NevermoreSSH
 # =====================================================
 
 # Color
@@ -106,7 +105,6 @@ sudo lsof -t -i tcp:80 -s tcp:listen | sudo xargs kill
 #bash acme.sh --install
 #rm acme.sh
 #cd .acme.sh
-#bash acme.sh --register-account -m nevermoressh@gmail.com
 #bash acme.sh --issue --standalone -d $domain --force
 #bash acme.sh --installcert -d $domain --fullchainpath /etc/shadowsocks/xray.crt --keypath /etc/shadowsocks/xray.key
 

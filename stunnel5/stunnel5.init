@@ -17,7 +17,7 @@
 . /lib/lsb/init-functions
 
 DEFAULTPIDFILE="/var/run/stunnel.pid"
-DAEMON=/usr/local/nevermoressh/stunnel5
+DAEMON=/usr/local/bin/stunnel5
 NAME=stunnel5
 DESC="Stunnel5 Service"
 OPTIONS=""

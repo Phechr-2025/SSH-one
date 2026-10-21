@@ -1,5 +1,4 @@
 #!/bin/bash
-# By NevermoreSSH
 # ==========================================
 # Color
 RED='\033[0;31m'
@@ -60,4 +59,4 @@ echo "=========================="
 echo "Username  : $VPN_USER"
 echo "Expired   : $exp"
 echo "=========================="
-echo "Script Mod By NevermoreSSH"
+echo "Script Mod"

@@ -1,5 +1,4 @@
 #!/bin/bash
-# Script Mod By NevermoreSSH
 #!/bin/bash
 clear
 MAX=1

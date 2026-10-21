@@ -1,5 +1,4 @@
 #!/bin/bash
-# By NevermoreSSH
 # ==========================================
 # Color
 RED='\033[0;31m'
@@ -56,4 +55,4 @@ echo "=========================="
 echo "Username  : $user"
 echo "Expired   : $exp"
 echo "=========================="
-echo "Script Mod By NevermoreSSH"
+echo "Script Mod"

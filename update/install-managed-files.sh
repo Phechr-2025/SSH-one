@@ -10,10 +10,21 @@ manifest="$repo_root/update/managed-files.tsv"
 if [[ -e /etc/ssh-one/installation-complete ]]; then
   fail 'SSH-one is already installed; use ssh-one-update to refresh managed files.'
 fi
+[[ -e /etc/ssh-one/install-in-progress ]] || fail 'the active installation marker is missing; refusing to replace command paths outside setup.'
 install -d -m 0755 /usr/bin /etc/ssh-one
 stage_dir=$(mktemp -d /usr/bin/.ssh-one-files.XXXXXX) || fail 'could not create the command staging directory.'
 declare -a installed_targets=()
 declare -A targets=() had_target=()
+declare -A preexisting_targets=()
+preexisting_manifest=/etc/ssh-one/backups/managed-bin/preexisting-managed-bin.tsv
+if [[ -r $preexisting_manifest ]]; then
+  while IFS= read -r target || [[ -n $target ]]; do
+    target=${target%$'\r'}
+    [[ -n $target ]] || continue
+    [[ $target =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ && -z ${preexisting_targets[$target]:-} ]] || fail 'the saved pre-install command list is invalid.'
+    preexisting_targets[$target]=1
+  done < "$preexisting_manifest"
+fi
 rollback() {
   local target restore
   for target in "${installed_targets[@]}"; do
@@ -75,9 +86,23 @@ while IFS=$'\t' read -r source target mode kind extra; do
   esac
   if [[ -e /usr/bin/$target || -L /usr/bin/$target ]]; then
     [[ -f /usr/bin/$target && ! -L /usr/bin/$target ]] || fail "refusing a non-regular file or symbolic-link command path: /usr/bin/$target"
-    had_target[$target]=1
-    [[ -f /etc/ssh-one/backups/managed-bin/$target && ! -L /etc/ssh-one/backups/managed-bin/$target ]] ||
-      fail "a pre-existing command has no safe backup: /usr/bin/$target"
+    if [[ ${preexisting_targets[$target]:-0} == 1 ]]; then
+      [[ -f /etc/ssh-one/backups/managed-bin/$target && ! -L /etc/ssh-one/backups/managed-bin/$target ]] ||
+        fail "the pre-install backup is missing for /usr/bin/$target"
+      had_target[$target]=1
+    elif [[ -r $preexisting_manifest ]]; then
+      # The legacy service installers create these command files during setup.
+      # The pre-install list proves this path did not exist before this run.
+      had_target[$target]=0
+    elif [[ -f /etc/ssh-one/backups/managed-bin/$target && ! -L /etc/ssh-one/backups/managed-bin/$target ]]; then
+      # Compatibility with v18 partial installs, which backed up old files but
+      # did not save a separate list of paths that existed before setup.
+      had_target[$target]=1
+    else
+      # v18's setup preflight checked all command names before legacy installers
+      # wrote them. A missing backup therefore means this is a new setup file.
+      had_target[$target]=0
+    fi
   else
     had_target[$target]=0
   fi
