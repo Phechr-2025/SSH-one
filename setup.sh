@@ -1,6 +1,8 @@
 #!/bin/bash
 
+SSH_ONE_SOURCE_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 SSH_ONE_REPO_CONFIG=${SSH_ONE_REPO_CONFIG:-/etc/ssh-one/repository.conf}
+# shellcheck source=/etc/ssh-one/repository.conf
 if [ -r "$SSH_ONE_REPO_CONFIG" ]; then . "$SSH_ONE_REPO_CONFIG"; fi
 if [ "${EUID}" -ne 0 ]; then
 		echo "You need to run this script as root"
@@ -10,17 +12,6 @@ if [ "$(systemd-detect-virt)" == "openvz" ]; then
 		echo "OpenVZ is not supported"
 		exit 1
 fi
-# ==========================================
-# Color
-RED='\033[0;31m'
-NC='\033[0m'
-GREEN='\033[0;32m'
-ORANGE='\033[0;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-LIGHT='\033[0;37m'
-# ==========================================
 # Link Hosting Kalian Untuk Ssh Vpn
 akbarvpn="${SSH_ONE_RAW_HOST}/ssh"
 # Link Hosting Kalian Untuk Sstp
@@ -59,8 +50,6 @@ if [ -e "/etc/xray/domain" ] || [ -e "/etc/v2ray/domain" ] || [ -e "/root/domain
 		report_error "SSH/VPN installation files already exist. This may be an existing or partial installation; use a fresh VPS unless a recovery procedure specifically covers that version."
 		exit 1
 fi
-mkdir -p /var/lib/crot
-echo "IP=" >> /var/lib/crot/ipvps.conf
 if ! wget -q -O slhost.sh "https://${akbarvpn}/slhost.sh"; then
 		report_error "Could not download the host/DNS setup script from ${akbarvpn}/slhost.sh"
 		exit 1
@@ -74,10 +63,51 @@ if ! install -d -m 0755 /etc/ssh-one; then
 	report_error "Could not create the SSH-one state directory."
 	exit 1
 fi
-if ! printf 'v17 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
+if ! printf 'v18 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
 	report_error "Could not write the installation-in-progress marker."
 	exit 1
 fi
+
+# Preserve any command paths that the legacy installers will replace, so uninstall
+# can restore them instead of deleting files that predated SSH-one.
+backup_preexisting_paths() {
+	local path name source target
+	local manifest="$SSH_ONE_SOURCE_ROOT/update/managed-files.tsv"
+	local command_backup=/etc/ssh-one/backups/managed-bin
+	local runtime_backup=/etc/ssh-one/backups/runtime
+	if [[ ! -r "$manifest" ]]; then
+		report_error "Managed-file manifest is missing: $manifest"
+		return 1
+	fi
+	install -d -m 0700 "$command_backup" "$runtime_backup" || return 1
+	while IFS=$'\t' read -r source target _; do
+		[[ -n "$source" && "$source" != \#* ]] || continue
+		[[ "$target" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]] || { report_error "Invalid target in managed-file manifest: $target"; return 1; }
+		path="/usr/bin/$target"
+		if [[ -L "$path" ]]; then
+			report_error "A symbolic link already uses the command path $path. Resolve this collision before installing."
+			return 1
+		elif [[ -f "$path" ]]; then
+			cp -a -- "$path" "$command_backup/$target" || { report_error "Could not preserve pre-existing command $path"; return 1; }
+		elif [[ -e "$path" ]]; then
+			report_error "A non-file already uses the command path $path. Resolve this collision before installing."
+			return 1
+		fi
+	done < "$manifest"
+	for path in /usr/local/bin/xray /usr/local/bin/trojan-go /usr/local/bin/ws-tls /usr/local/bin/ws-nontls /usr/local/bin/ws-ovpn /usr/local/bin/ohpserver /bin/udpgw /root/udp/udp-custom; do
+		if [[ -L "$path" ]]; then
+			report_error "A symbolic link already uses the runtime path $path. Resolve this collision before installing."
+			return 1
+		elif [[ -f "$path" ]]; then
+			name=${path##*/}
+			cp -a -- "$path" "$runtime_backup/$name" || { report_error "Could not preserve pre-existing runtime file $path"; return 1; }
+		elif [[ -e "$path" ]]; then
+			report_error "A non-file already uses the runtime path $path. Resolve this collision before installing."
+			return 1
+		fi
+	done
+}
+backup_preexisting_paths || exit 1
 # Do not pass the Cloudflare token to unrelated legacy service installers.
 unset CF_API_TOKEN
 
@@ -173,6 +203,22 @@ if [[ -f "$autosett_unit" ]] && grep -Fq 'ExecStart=/bin/bash /etc/set.sh' "$aut
 	systemctl reset-failed autosett.service >/dev/null 2>&1 || true
 fi
 echo "Autosett skipped: upstream ssh/set.sh is unavailable." | tee -a /root/log-install.txt
+if ! bash "$SSH_ONE_SOURCE_ROOT/update/install-managed-files.sh"; then
+	report_error "Could not safely install the SSH-one command inventory."
+	exit 1
+fi
+if [[ ! -x /usr/bin/menu ]] || ! /usr/bin/menu --check; then
+	report_error "The main menu failed its post-installation check. Run /usr/bin/menu --check for details."
+	exit 1
+fi
+resolved_menu=$(type -P menu 2>/dev/null || true)
+if [[ -n "$resolved_menu" && "$resolved_menu" != /usr/bin/menu ]]; then
+	report_error "The command 'menu' currently resolves to $resolved_menu instead of /usr/bin/menu. Use /usr/bin/menu or remove the conflicting command from PATH."
+fi
+if [[ -n ${SSH_ONE_DOMAIN_HOST:-} ]]; then
+	printf '%s\n' "$SSH_ONE_DOMAIN_HOST" > /etc/ssh-one/host || { report_error "Could not save the configured host name."; exit 1; }
+fi
+printf "Main menu installed. Run 'menu' after installation, or use /usr/bin/menu.\n" | tee -a /root/log-install.txt
 history -c
 echo "1.2" > /home/ver
 echo " "
@@ -210,7 +256,7 @@ echo "   - OHP SSH                 : 8181"  | tee -a /root/log-install.txt
 echo "   - OHP Dropbear            : 8282"  | tee -a /root/log-install.txt
 echo "   - OHP OpenVPN             : 8383"  | tee -a /root/log-install.txt
 echo "   - TrojanGo                : 2087"  | tee -a /root/log-install.txt
-echo "   - UDP Custom              : default listener 36712/UDP; UDP range/firewall 1-65535 (subject to conflicts/provider firewall)" | tee -a /root/log-install.txt
+echo "   - UDP Custom              : firewall UDP 1-65535 by default (customizable); listener 36712/UDP by default (customizable)" | tee -a /root/log-install.txt
 echo ""  | tee -a /root/log-install.txt
 echo "   >>> Server Information & Other Features"  | tee -a /root/log-install.txt
 echo "   - Timezone                : Asia/Kuala_Lumpur (GMT +8)"  | tee -a /root/log-install.txt
@@ -276,7 +322,7 @@ if passwd -S root 2>/dev/null | awk '$2 == "L" || $2 == "NP" { locked=1 } END { 
 fi
 
 rm -f /etc/ssh-one/install-in-progress || { report_error "Could not remove the installation-in-progress marker."; exit 1; }
-printf 'v17\n' > /etc/ssh-one/installation-complete || { report_error "Could not write the installation marker."; exit 1; }
+printf 'v18\n' > /etc/ssh-one/installation-complete || { report_error "Could not write the installation marker."; exit 1; }
 printf 'Installation complete. SSH config and TCP 22/2253 listeners passed checks. VPS will reboot in 10 seconds.\n' | tee -a /root/log-install.txt
 for remaining in {10..1}; do
 	printf '\rRestarting VPS in %2d seconds...' "$remaining"

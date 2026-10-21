@@ -150,11 +150,12 @@ save_iptables_rules() {
 }
 
 open_ports() {
-  local raw_protocol entry proto rule_added=0
+  local raw_protocol port_input entry proto rule_added=0
   local -a protocols
-  printf '\nProtocol [tcp/udp/both]: '
+  printf '\nProtocol [udp/tcp/both; default udp]: '
   read -r raw_protocol || return 0
   raw_protocol=${raw_protocol,,}
+  raw_protocol=${raw_protocol:-udp}
   case $raw_protocol in
     tcp) protocols=(tcp) ;;
     udp) protocols=(udp) ;;
@@ -162,9 +163,17 @@ open_ports() {
     *) fail 'Choose tcp, udp, or both.'; pause; return 1 ;;
   esac
 
-  printf 'Ports/ranges (examples: 53,443 or 10000-10100): '
-  read -r raw_protocol || return 0
-  if ! normalize_ports "$raw_protocol"; then pause; return 1; fi
+  printf 'Ports/ranges [default 1-65535] (examples: 53,443 or 10000-10100): '
+  read -r port_input || return 0
+  if [[ -z $port_input ]]; then
+    if [[ $raw_protocol == tcp || $raw_protocol == both ]]; then
+      fail 'Enter the TCP port/range explicitly; the 1-65535 default applies to UDP only.'
+      pause
+      return 1
+    fi
+    port_input='1-65535'
+  fi
+  if ! normalize_ports "$port_input"; then pause; return 1; fi
 
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
     for proto in "${protocols[@]}"; do
@@ -195,8 +204,90 @@ open_ports() {
   pause
 }
 
+change_listener_port() {
+  local config=/root/udp/config.json current new_port port_number backup
+  [[ -r $config ]] || { fail 'UDP Custom config was not found. Install/repair UDP Custom first.'; pause; return 1; }
+  command -v python3 >/dev/null 2>&1 || { fail 'python3 is required to safely edit the UDP Custom config.'; pause; return 1; }
+  current=$(python3 - "$config" <<'PY'
+import json, re, sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as stream:
+        data = json.load(stream)
+    listen = data.get('listen', '')
+    match = re.fullmatch(r'.*:([0-9]{1,5})', listen)
+    if not match:
+        raise ValueError('unsupported listen address')
+    print(match.group(1))
+except Exception as error:
+    print(f'Could not read the current listener port: {error}', file=sys.stderr)
+    sys.exit(1)
+PY
+  ) || { fail 'Could not read the UDP Custom listener from config.json.'; pause; return 1; }
+  printf 'New UDP Custom listener port [current %s]: ' "$current"
+  read -r new_port || return 0
+  new_port=${new_port:-$current}
+  [[ $new_port =~ ^[0-9]{1,5}$ ]] || { fail 'Enter one port number from 1 to 65535.'; pause; return 1; }
+  port_number=$((10#$new_port))
+  (( port_number >= 1 && port_number <= 65535 )) || { fail 'Listener port must be from 1 to 65535.'; pause; return 1; }
+  if [[ $port_number == "$current" ]]; then
+    printf 'UDP Custom already listens on UDP %s.\n' "$current"
+    pause
+    return 0
+  fi
+  if command -v ss >/dev/null 2>&1 && ss -H -lun "sport = :$port_number" 2>/dev/null | grep -q .; then
+    fail "UDP port $port_number is already in use. Choose an unused port."
+    pause
+    return 1
+  fi
+  backup=$(mktemp /root/udp/config.json.ssh-one-bak.XXXXXX) || { fail 'Could not create a config backup.'; pause; return 1; }
+  cp -p -- "$config" "$backup" || { rm -f -- "$backup"; fail 'Could not back up config.json.'; pause; return 1; }
+  if ! python3 - "$config" "$port_number" <<'PY'
+import json, os, stat, sys, tempfile
+path, port = sys.argv[1], sys.argv[2]
+with open(path, encoding='utf-8') as stream:
+    data = json.load(stream)
+listen = data.get('listen')
+if not isinstance(listen, str) or ':' not in listen:
+    raise SystemExit('Unsupported listen address in config.json.')
+host, _, _old_port = listen.rpartition(':')
+data['listen'] = f'{host}:{port}'
+mode = stat.S_IMODE(os.stat(path).st_mode)
+fd, temp_path = tempfile.mkstemp(prefix='.config.json.', dir=os.path.dirname(path))
+try:
+    with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+        json.dump(data, stream, indent=2)
+        stream.write('\n')
+    os.chmod(temp_path, mode)
+    os.replace(temp_path, path)
+except BaseException:
+    try:
+        os.unlink(temp_path)
+    except FileNotFoundError:
+        pass
+    raise
+PY
+  then
+    cp -p -- "$backup" "$config"
+    rm -f -- "$backup"
+    fail 'Could not update config.json; the original config was restored.'
+    pause
+    return 1
+  fi
+  if systemctl restart udp-custom.service; then
+    rm -f -- "$backup"
+    printf 'UDP Custom now listens on UDP %s. Open this port in the host and provider firewalls if needed.\n' "$port_number"
+  else
+    cp -p -- "$backup" "$config"
+    rm -f -- "$backup"
+    systemctl restart udp-custom.service >/dev/null 2>&1 || true
+    fail 'UDP Custom could not start on the new port. The previous config was restored.'
+    return 1
+  fi
+  pause
+}
+
 create_udp_user() {
-  local username password confirmation
+  local username password confirmation server_port
   [[ -x /root/udp/udp-custom ]] || { fail 'UDP Custom is not installed. Choose Install/repair UDP Custom first.'; pause; return 1; }
   printf 'Username (4-32 letters/numbers/._-): '
   read -r username || return 0
@@ -235,7 +326,20 @@ create_udp_user() {
   fi
   unset password confirmation
   printf 'UDP Custom account created: %s\n' "$username"
-  printf 'Use this username/password with a client that supports UDP Custom. The default server port is 36712/UDP.\n'
+  server_port=$(python3 - /root/udp/config.json <<'PY'
+import json, re, sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as stream:
+        listen = json.load(stream).get('listen', '')
+    match = re.fullmatch(r'.*:([0-9]{1,5})', listen)
+    if not match:
+        raise ValueError('unsupported listen address')
+    print(match.group(1))
+except Exception:
+    print('unknown')
+PY
+  )
+  printf 'Use this username/password with a client that supports UDP Custom. Current server listener: UDP %s.\n' "$server_port"
   pause
 }
 
@@ -296,24 +400,26 @@ restart_udp() {
 while true; do
   clear 2>/dev/null || true
   printf '%s\n' '================ SSH-one UDP & Port Menu ================'
-  printf '%s\n' '1. Check UDP Custom service status'
-  printf '%s\n' '2. Install/repair UDP Custom'
-  printf '%s\n' '3. Open port(s) in host firewall (TCP, UDP, or both)'
-  printf '%s\n' '4. Create UDP Custom account'
-  printf '%s\n' '5. List UDP Custom accounts'
-  printf '%s\n' '6. Delete UDP Custom account'
-  printf '%s\n' '7. Restart UDP Custom services'
+  printf '%s\n' '1. Open port(s) in host firewall (default UDP 1-65535; customizable)'
+  printf '%s\n' '2. Change UDP Custom listener port (default 36712)'
+  printf '%s\n' '3. Check UDP Custom service status'
+  printf '%s\n' '4. Install/repair UDP Custom'
+  printf '%s\n' '5. Create UDP Custom account'
+  printf '%s\n' '6. List UDP Custom accounts'
+  printf '%s\n' '7. Delete UDP Custom account'
+  printf '%s\n' '8. Restart UDP Custom services'
   printf '%s\n' '0. Back to main menu'
   printf '%s\n' '=========================================================='
   read -r -p 'Select an option: ' choice || exit 0
   case $choice in
-    1) show_status ;;
-    2) install_udp || true ;;
-    3) open_ports || true ;;
-    4) create_udp_user || true ;;
-    5) list_udp_users ;;
-    6) delete_udp_user || true ;;
-    7) restart_udp || true ;;
+    1) open_ports || true ;;
+    2) change_listener_port || true ;;
+    3) show_status ;;
+    4) install_udp || true ;;
+    5) create_udp_user || true ;;
+    6) list_udp_users ;;
+    7) delete_udp_user || true ;;
+    8) restart_udp || true ;;
     0) exit 0 ;;
     *) fail 'Invalid option.'; pause ;;
   esac

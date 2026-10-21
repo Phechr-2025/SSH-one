@@ -6,6 +6,8 @@ fail() {
   if [[ -w /root/log-install.txt ]]; then printf 'SSH-one: %s\n' "$*" >> /root/log-install.txt; fi
   exit 1
 }
+# ShellCheck cannot follow the assignments inside this quoted ERR trap.
+# shellcheck disable=SC2154
 trap 'status=$?; message="SSH-one: command failed at line $LINENO (exit $status)."; printf "%s\n" "$message" >&2; if [[ -w /root/log-install.txt ]]; then printf "%s\n" "$message" >> /root/log-install.txt; fi' ERR
 
 valid_fqdn() {
@@ -105,7 +107,7 @@ touch /root/log-install.txt || fail 'cannot create /root/log-install.txt.'
 command -v flock >/dev/null 2>&1 || fail 'flock is required; install util-linux and try again.'
 exec 9>/run/lock/ssh-one-install.lock || fail 'cannot create the SSH-one installation lock.'
 flock -n 9 || fail 'another SSH-one installation is already running.'
-printf '\n==== SSH-one v17 install attempt: %s ====\n' "$(date -Is)" >> /root/log-install.txt
+printf '\n==== SSH-one v18 install attempt: %s ====\n' "$(date -Is)" >> /root/log-install.txt
 
 if [[ -e /etc/ssh-one/installation-complete ]]; then
   fail 'SSH-one is already installed. This installer will not run a second time.'

@@ -315,7 +315,7 @@ Set_config_enable(){
 	elif [[ "${enable}" == "0" ]]; then
 		echo -e "Port [${ssr_port}] The account status is：${Green_font_prefix}Disabled ${Font_color_suffix} , switch to ${Red_font_prefix}Disabled${Font_color_suffix} ?[Y/n]"
 		read -e -p "(Default: Y):" ssr_enable_yn
-		[[ -z "${ssr_enable_yn}" ]] && ssr_enable_yn = "y"
+		[[ -z "${ssr_enable_yn}" ]] && ssr_enable_yn="y"
 		if [[ "${ssr_enable_yn}" == [Yy] ]]; then
 			ssr_enable="1"
 		else

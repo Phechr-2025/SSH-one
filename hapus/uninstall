@@ -1,51 +1,215 @@
-systemctl stop ws-tls
-systemctl stop ws-nontls
-systemctl stop ws-ovpn
-systemctl stop squid
-systemctl stop sslh
-systemctl stop squid3
-systemctl stop stunnel4
-systemctl stop stunnel5
-pkill stunnel4
-pkill stunnel5
-pkill squid
-pkill squid3
-pkill squid-1
-pkill squid-3
-pkill python
-cd
-rm -rf /etc/systemd/system/ws-nontls.service
-rm -rf /etc/systemd/system/ws-tls.service
-rm -rf /usr/local/bin/ws-nontls
-rm -rf /usr/local/bin/ws-tls
-rm -rf /etc/systemd/system/ws-ovpn.service
-rm -rf /usr/local/bin/ws-ovpn
-rm -rf /etc/default/sslh
-rm -rf -f stunnel
-rm -rf stunnel5.zip
-rm -rf /etc/stunnel5/stunnel5.conf
-rm -rf /usr/local/share/doc/stunnel/
-rm -rf /usr/local/etc/stunnel/
-rm -rf /usr/local/bin/stunnel
-rm -rf /usr/local/bin/stunnel3
-rm -rf /usr/local/bin/stunnel4
-rm -rf /usr/local/bin/stunnel5
-apt-get remove stunnel4
-apt-get remove stunnel5
-apt-get remove --auto-remove stunnel4
-apt-get remove --auto-remove stunnel5
-apt-get purge stunnel4
-apt-get purge stunnel5
-apt-get purge --auto-remove stunnel4
-apt-get purge --auto-remove stunnel5
-apt remove sslh
-apt-get remove --auto-remove sslh
-apt-get purge sslh
-apt-get purge --auto-remove sslh
-apt autoclean
-apt autoremove
-apt-get remove squid -y
-apt-get remove --auto-remove squid
-apt-get purge squid
-apt-get purge --auto-remove squid
-cd
+#!/usr/bin/env bash
+set -Eeuo pipefail
+export LC_ALL=C
+
+fail() { printf 'SSH-one uninstall: %s\n' "$*" >&2; exit 1; }
+note() { printf 'SSH-one uninstall: %s\n' "$*"; }
+[[ ${EUID:-$(id -u)} -eq 0 ]] || fail 'run this command as root.'
+if [[ ! -r /etc/ssh-one/installation-complete && ! -r /etc/ssh-one/install-in-progress ]]; then
+  fail 'no complete or interrupted SSH-one installation marker was found; refusing unverified cleanup.'
+fi
+for tool in flock sha256sum awk systemctl; do command -v "$tool" >/dev/null 2>&1 || fail "$tool is required."; done
+
+printf 'This removes SSH-one services and configuration, plus data under SSH-one service directories.\n'
+printf 'SSH access, system packages, untagged firewall rules, and untracked Linux accounts are preserved.\n'
+printf 'Type UNINSTALL to continue: '
+IFS= read -r answer || fail 'could not read confirmation.'
+[[ $answer == UNINSTALL ]] || { note 'cancelled; no files were removed.'; exit 0; }
+
+install -d -m 0755 /run/lock
+exec 8>/run/lock/ssh-one-install.lock || fail 'could not open the installation lock.'
+flock -n 8 || fail 'installation is running; retry after it finishes.'
+exec 9>/run/lock/ssh-one-update.lock || fail 'could not open the update lock.'
+flock -n 9 || fail 'an update is running; retry after it finishes.'
+exec 7>/run/lock/ssh-one-uninstall.lock || fail 'could not create the uninstall lock.'
+flock -n 7 || fail 'another SSH-one uninstall is already running.'
+
+log_file=/root/log-install.txt
+printf '\n==== SSH-one uninstall started: %s ====\n' "$(date -Is)" >> "$log_file"
+preserved=0
+
+units=(
+  'udp-custom.service|/root/udp/udp-custom'
+  'udpgw.service|/bin/udpgw'
+  'ws-tls.service|/usr/local/bin/ws-tls'
+  'ws-nontls.service|/usr/local/bin/ws-nontls'
+  'ws-ovpn.service|/usr/local/bin/ws-ovpn'
+  'xray.service|/etc/xray/config.json'
+  'trojan-go.service|/etc/trojan-go/config.json'
+  'ssh-ohp.service|/usr/local/bin/ohpserver'
+  'dropbear-ohp.service|/usr/local/bin/ohpserver'
+  'openvpn-ohp.service|/usr/local/bin/ohpserver'
+  'stunnel5.service|/etc/stunnel5/stunnel5.conf'
+  'rc-local.service|ExecStart=/etc/rc.local start'
+  'autosett.service|ExecStart=/bin/bash /etc/set.sh'
+)
+for entry in "${units[@]}"; do
+  unit=${entry%%|*}
+  signature=${entry#*|}
+  unit_file="/etc/systemd/system/$unit"
+  [[ -f $unit_file ]] || continue
+  if ! grep -Fq -- "$signature" "$unit_file"; then
+    note "left $unit because its unit file does not match a known SSH-one path."
+    preserved=1
+    continue
+  fi
+  if systemctl is-active --quiet "$unit"; then
+    if ! systemctl stop "$unit" >/dev/null 2>&1 || systemctl is-active --quiet "$unit"; then
+      fail "$unit is still running; its files and data were left in place. Inspect systemctl status $unit and retry."
+    fi
+  fi
+  systemctl disable "$unit" >/dev/null 2>&1 || note "could not disable $unit, but it is stopped."
+  rm -f -- "$unit_file" "/etc/systemd/system/multi-user.target.wants/$unit"
+  note "removed verified unit $unit."
+done
+if ! systemctl daemon-reload; then
+  note 'systemd daemon-reload failed; retained uninstall state for recovery.'
+  preserved=1
+fi
+
+if [[ -f /etc/crontab ]]; then
+  cron_tmp=$(mktemp /etc/crontab.ssh-one.XXXXXX) || fail 'could not stage crontab cleanup.'
+  if ! awk '
+    /^# SSH-one scheduled tasks BEGIN$/ { skip=1; next }
+    /^# SSH-one scheduled tasks END$/ { skip=0; next }
+    skip { next }
+    $0 == "5 1 * * * root delexp && xp && restart" { next }
+    $0 == "5 4 * * * root clearlog && sslh-fix-reboot" { next }
+    $0 == "0 0 * * * root clearlog" { next }
+    $0 == "0 1 * * * root delexp" { next }
+    $0 == "0 2 * * * root xp" { next }
+    $0 == "0 3 * * * root restart" { next }
+    $0 == "0 4 * * * root sslh-fix-reboot" { next }
+    $0 == "0 5 * * * root reboot" { next }
+    $0 == "0 6 * * * root backup" { next }
+    $0 == "0 23 * * * root backup" { next }
+    $0 == "5 1 * * * root /usr/bin/delexp" { next }
+    $0 == "5 2 * * * root /usr/bin/xp" { next }
+    $0 == "5 23 * * * root /usr/bin/backup" { next }
+    { print }
+  ' /etc/crontab > "$cron_tmp"; then
+    rm -f -- "$cron_tmp"
+    fail 'could not filter /etc/crontab.'
+  fi
+  chmod --reference=/etc/crontab "$cron_tmp"
+  chown --reference=/etc/crontab "$cron_tmp" 2>/dev/null || true
+  mv -fT -- "$cron_tmp" /etc/crontab
+fi
+if [[ -f /etc/cron.d/tendang ]] && grep -Eq '(^# Autokill$|/usr/bin/tendang)' /etc/cron.d/tendang; then
+  cron_tmp=$(mktemp /etc/cron.d/tendang.ssh-one.XXXXXX) || fail 'could not stage /etc/cron.d/tendang cleanup.'
+  awk '$0 == "# Autokill" || /\/usr\/bin\/tendang/ { next } { print }' /etc/cron.d/tendang > "$cron_tmp" || fail 'could not filter /etc/cron.d/tendang.'
+  if [[ -s $cron_tmp ]]; then chmod --reference=/etc/cron.d/tendang "$cron_tmp"; mv -fT -- "$cron_tmp" /etc/cron.d/tendang
+  else rm -f -- "$cron_tmp" /etc/cron.d/tendang
+  fi
+fi
+if [[ -f /etc/cron.d/reboot ]] && grep -Fq '/sbin/reboot' /etc/cron.d/reboot; then
+  note 'left /etc/cron.d/reboot unchanged because its schedule cannot be safely attributed to SSH-one.'
+  preserved=1
+fi
+
+removed_badvpn_start=0
+if [[ -f /etc/rc.local ]] && grep -Eq 'screen -dmS badvpn badvpn-udpgw --listen-addr 127\.0\.0\.1:(7100|7200|7300)' /etc/rc.local; then
+  rc_tmp=$(mktemp /etc/rc.local.ssh-one.XXXXXX) || fail 'could not stage rc.local cleanup.'
+  awk '!/screen -dmS badvpn badvpn-udpgw --listen-addr 127\.0\.0\.1:(7100|7200|7300)/ { print }' /etc/rc.local > "$rc_tmp" || fail 'could not filter /etc/rc.local.'
+  chmod --reference=/etc/rc.local "$rc_tmp"
+  chown --reference=/etc/rc.local "$rc_tmp" 2>/dev/null || true
+  mv -fT -- "$rc_tmp" /etc/rc.local
+  removed_badvpn_start=1
+fi
+if (( removed_badvpn_start == 1 )) && command -v pkill >/dev/null 2>&1; then
+  pkill -x badvpn-udpgw >/dev/null 2>&1 || true
+fi
+
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -Fq 'SSH-one UDP Custom'; then
+  while :; do
+    rule_number=$(ufw status numbered 2>/dev/null | sed -n 's/^[[:space:]]*\[[[:space:]]*\([0-9][0-9]*\)\].*SSH-one UDP Custom.*/\1/p' | head -n 1)
+    [[ -n $rule_number ]] || break
+    if ! ufw --force delete "$rule_number" >/dev/null 2>&1; then
+      note 'could not remove a tagged UDP Custom UFW rule.'
+      preserved=1
+      break
+    fi
+  done
+fi
+
+runtime_allowlist=(
+  /usr/local/bin/xray /usr/local/bin/trojan-go
+  /usr/local/bin/ws-tls /usr/local/bin/ws-nontls /usr/local/bin/ws-ovpn
+  /usr/local/bin/ohpserver /bin/udpgw /root/udp/udp-custom
+)
+if [[ -r /etc/ssh-one/runtime-files.sha256 ]]; then
+  while IFS=$'\t' read -r path expected extra; do
+    [[ -n ${path:-} && -n ${expected:-} ]] || continue
+    if [[ -n ${extra:-} || ! $expected =~ ^[a-f0-9]{64}$ ]]; then
+      note 'ignored a malformed runtime checksum entry.'
+      preserved=1
+      continue
+    fi
+    allowed=0
+    for item in "${runtime_allowlist[@]}"; do [[ $path == "$item" ]] && allowed=1; done
+    if (( allowed == 0 )); then note "ignored unapproved runtime path: $path"; preserved=1; continue; fi
+    if [[ -L $path ]]; then note "preserved symbolic-link runtime path: $path"; preserved=1; continue; fi
+    [[ -f $path ]] || continue
+    actual=$(sha256sum -- "$path" | awk '{print $1}')
+    if [[ $actual != "$expected" ]]; then note "preserved runtime file with local changes: $path"; preserved=1; continue; fi
+    runtime_backup="/etc/ssh-one/backups/runtime/${path##*/}"
+    if [[ -f $runtime_backup && ! -L $runtime_backup ]]; then
+      cp -a -- "$runtime_backup" "${path%/*}/.ssh-one-restore-${path##*/}"
+      mv -fT -- "${path%/*}/.ssh-one-restore-${path##*/}" "$path"
+      note "restored pre-install runtime file $path."
+    else
+      rm -f -- "$path"
+      note "removed verified runtime file $path."
+    fi
+  done < /etc/ssh-one/runtime-files.sha256
+else
+  note 'no runtime checksum inventory exists; runtime binaries were preserved.'
+  preserved=1
+fi
+
+if [[ -r /etc/ssh-one/managed-files.sha256 ]]; then
+  while IFS=$'\t' read -r target expected extra; do
+    [[ -n ${target:-} && -n ${expected:-} ]] || continue
+    if [[ ! $target =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ || ! $expected =~ ^[a-f0-9]{64}$ || -n ${extra:-} ]]; then
+      note 'ignored a malformed managed-command checksum entry.'
+      preserved=1
+      continue
+    fi
+    dest="/usr/bin/$target"
+    if [[ -L $dest ]]; then note "preserved symbolic-link command path: $dest"; preserved=1; continue; fi
+    [[ -f $dest ]] || continue
+    actual=$(sha256sum -- "$dest" | awk '{print $1}')
+    if [[ $actual != "$expected" ]]; then note "preserved command with local changes: $dest"; preserved=1; continue; fi
+    backup="/etc/ssh-one/backups/managed-bin/$target"
+    if [[ -f $backup && ! -L $backup ]]; then
+      cp -a -- "$backup" "/usr/bin/.ssh-one-restore-$target"
+      mv -fT -- "/usr/bin/.ssh-one-restore-$target" "$dest"
+      note "restored pre-install command $dest."
+    else
+      rm -f -- "$dest"
+    fi
+  done < /etc/ssh-one/managed-files.sha256
+else
+  note 'no managed-command checksum inventory exists; command files were preserved.'
+  preserved=1
+fi
+
+for path in /etc/xray /etc/trojan-go /etc/wireguard /root/udp /var/lib/crot; do
+  if [[ -d $path ]]; then rm -rf -- "$path"; note "removed SSH-one data directory $path."; fi
+done
+if [[ -f /home/ver ]]; then
+  version_value=$(tr -d '\r\n' < /home/ver)
+  if [[ $version_value == 1.2 ]]; then rm -f -- /home/ver
+  else note 'preserved /home/ver because it does not match SSH-one version data.'; preserved=1
+  fi
+fi
+
+if (( preserved == 0 )); then
+  rm -rf -- /etc/ssh-one
+else
+  note 'kept /etc/ssh-one and its backups because files were preserved; review them before retrying cleanup.'
+fi
+printf 'SSH-one uninstall finished. Review the notes above for preserved files and services.\n'
+printf 'System packages and untagged firewall rules were preserved.\n' >> "$log_file"
+printf '==== SSH-one uninstall finished: %s ====\n' "$(date -Is)" >> "$log_file"
+note 'uninstall completed. SSH access and operating-system packages were left in place.'

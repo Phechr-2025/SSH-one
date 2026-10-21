@@ -99,11 +99,10 @@ sleep 1
 echo -e "[ ${G}INFO${NC} ] Delete Resolv.conf.d/head DNS"
 echo "nameserver 8.8.8.8" > /etc/resolvconf/resolv.conf.d/head
 sleep 1
-else if [ "$answer" = 'n' ] || [ "$answer" = 'N' ]; then
+elif [ "$answer" = 'n' ] || [ "$answer" = 'N' ]; then
 echo -e ""
 echo -e "[ ${G}INFO${NC} ] Operation Cancelled By User"
 sleep 1
-fi
 fi
 clear
 dns

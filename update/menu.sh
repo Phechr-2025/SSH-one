@@ -1,210 +1,153 @@
-#!/bin/bash
-clear
-m="\033[0;1;36m"
-y="\033[0;1;37m"
-yy="\033[0;1;32m"
-yl="\033[0;1;33m"
-wh="\033[0m"
-## Foreground
-DEFBOLD='\e[39;1m'
-RB='\e[31;1m'
-GB='\e[32;1m'
-YB='\e[33;1m'
-BB='\e[34;1m'
-MB='\e[35;1m'
-CB='\e[35;1m'
-WB='\e[37;1m'
-# Getting CPU Information
-cores=$(awk -F: '/model name/ {core++} END {print core}' /proc/cpuinfo)
-cpu_usage1="$(ps aux | awk 'BEGIN {sum=0} {sum+=$3}; END {print sum}')"
-cpu_usage="$((${cpu_usage1/\.*/} / ${corediilik:-1}))"
-cpu_usage+="%"
-load_cpu=$(printf '%-3s' "$(top -bn1 | awk '/Cpu/ { cpu = "" 100 - $8 "%" }; END { print cpu }')")
-#Domain & IPVPS
-domain=$(cat /etc/xray/domain)
-sldomain=$(cat /root/nsdomain)
-IPVPS=$(curl -s ipinfo.io/ip)
-IPVPS=$(curl -s ipinfo.io/ip )
-IPVPS=$(curl -sS ipv4.icanhazip.com)
-IPVPS=$(curl -sS ifconfig.me )
-# TOTAL ACC CREATE SSH/XRAYS
-ssh="$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd | wc -l)"
-vmess=$(grep -c -E "^### " "/etc/xray/config.json")
-vless=$(grep -c -E "^#### " "/etc/xray/config.json")
-tr=$(grep -c -E "^#&# " "/etc/xray/config.json")
-trgo=$(grep -c -E "^### " "/etc/trojan-go/akun.conf")
-# OS Uptime
-uptime="$(uptime -p | cut -d " " -f 2-10)"
-# RAM Info
-tram=$(free -m | awk 'NR==2 {print $2}')
-uram=$(free -m | awk 'NR==2 {print $3}')
-# Total BANDWIDTH
-dtoday="$(vnstat -i eth0 | grep "today" | awk '{print $2" "substr ($3, 1, 1)}')"
-utoday="$(vnstat -i eth0 | grep "today" | awk '{print $5" "substr ($6, 1, 1)}')"
-ttoday="$(vnstat -i eth0 | grep "today" | awk '{print $8" "substr ($9, 1, 1)}')"
-#Download/Upload yesterday
-dyest="$(vnstat -i eth0 | grep "yesterday" | awk '{print $2" "substr ($3, 1, 1)}')"
-uyest="$(vnstat -i eth0 | grep "yesterday" | awk '{print $5" "substr ($6, 1, 1)}')"
-tyest="$(vnstat -i eth0 | grep "yesterday" | awk '{print $8" "substr ($9, 1, 1)}')"
-#Download/Upload current month
-dmon="$(vnstat -i eth0 -m | grep "$(date +"%b '%y")" | awk '{print $3" "substr ($4, 1, 1)}')"
-umon="$(vnstat -i eth0 -m | grep "$(date +"%b '%y")" | awk '{print $6" "substr ($7, 1, 1)}')"
-tmon="$(vnstat -i eth0 -m | grep "$(date +"%b '%y")" | awk '{print $9" "substr ($10, 1, 1)}')"
-echo " "
-echo -e "$y                        MAIN MENU $wh"
-echo -e "$y                Script Mod By NevermoreSSH $wh"
-echo -e "${BB}————————————————————————————————————————————————————————${NC}"
-echo -e "                ${WB} ♦️ Server Information ♦️ ${NC}             "
-echo -e "${BB}————————————————————————————————————————————————————————${NC}"
-echo -e "  ${RB}♦️${NC} ${YB}OS       :  "$(hostnamectl | grep "Operating System" | cut -d ' ' -f5-) ${NC}         
-echo -e "  ${RB}♦️${NC} ${YB}KERNEL   :  $(uname -r) ${NC} "
-echo -e "  ${RB}♦️${NC} ${YB}UPTIME   :  $uptime ${NC} "
-echo -e "  ${RB}♦️${NC} ${YB}CPU      :  ${cores} core ($load_cpu)  ${NC} "
-echo -e "  ${RB}♦️${NC} ${YB}RAM      :  $uram MB / $tram MB ${NC} "
-echo -e "  ${RB}♦️${NC} ${YB}DOMAIN   :  $domain ${NC} "
-echo -e "  ${RB}♦️${NC} ${YB}DNSTT    :  $sldomain ${NC} "
-echo -e "  ${RB}♦️${NC} ${YB}IPVPS    :  $IPVPS ${NC} "
-echo -e "${BB}————————————————————————————————————————————————————————${NC}"
-echo -e "                  ${WB} ♦️ Total Bandwidth ♦️ ${NC}            "
-echo -e "${BB}————————————————————————————————————————————————————————${NC}"
-echo -e "  ${RB}♦️${NC} ${YB}Daily Usage         : $ttoday ${NC}"
-echo -e "  ${RB}♦️${NC} ${YB}Yesterday Usage     : $tyest ${NC}"
-echo -e "  ${RB}♦️${NC} ${YB}Monthly Usage       : $tmon ${NC}"
-echo -e "${BB}————————————————————————————————————————————————————————${NC}"
-echo -e "   ${YB} SSH     VMESS     VLESS     TROJAN     TROJANGO          "
-echo -e "${y}     $ssh        $vmess         $vless         $tr           $trgo         "
-echo -e "${BB}————————————————————————————————————————————————————————${NC}"
-echo -e "$YB 1$y.  SSH WEBSOCKET MENU  $wh"
-echo -e "$YB 2$y.  L2TP MENU$wh"
-echo -e "$YB 3$y.  PPTP MENU$wh"
-echo -e "$YB 4$y.  SSTP MENU$wh"
-echo -e "$YB 5$y.  WIREGUARD MENU$wh"
-echo -e "$YB 6$y.  SHADOWSOCKS MENU$wh"
-echo -e "$YB 7$y.  SHADOWSOCKSR MENU$wh"
-echo -e "$YB 8$y.  XRAY VMESS MENU$wh"
-echo -e "$YB 9$y.  XRAY VLESS MENU$wh"
-echo -e "$YB 10$y. XRAY TROJAN MENU$wh"
-echo -e "$YB 11$y. TROJAN GO MENU$wh"
-echo -e "$YB 12$y. INFO ALL PORT$wh"
-echo -e "$YB 13$y. XRAY VERSION$wh"
-echo -e "$YB 14$y. CHECK IP PORT$wh"
-echo -e "$YB 15$y. CHECK SERVICE VPN$wh"
-echo -e "$YB 16$y. UPDATE MENU (Update)$wh"
-echo -e "$YB 17$y. FIX SSLH+WS-TLS Error after reboot$wh"
-echo -e "$YB 18$y. SETTINGS$wh"
-echo -e "$YB 19$y. CHECK CPU & RAM$wh"
-echo -e "$YB 20$y. CHECK BANDWIDTH$wh"
-echo -e "$YB 21$y. DNS CHANGER$wh"
-echo -e "$YB 22$y. NETFLIX CHECKER$wh"
-echo -e "$YB 23$y. DELETE EXPIRED USERS$wh"
-echo -e "$YB 24$y. UDP CUSTOM & PORT FIREWALL MENU$wh"
-echo -e "$YB 25$y. EXIT$wh"
-echo -e "${BB}————————————————————————————————————————————————————————${NC}"
-echo -e "${YB}"
-read -p "Select From Options [ 1 - 25 ] : " menu
-case $menu in
-1)
-clear
-sshovpnmenu
-;;
-2)
-clear
-l2tpmenu
-;;
-3)
-clear
-pptpmenu
-;;
-4)
-clear
-sstpmenu
-;;
-5)
-clear
-wgmenu
-;;
-6)
-clear
-ssmenu
-;;
-7)
-clear
-ssrmenu
-;;
-8)
-clear
-vmessmenu
-;;
-9)
-clear
-vlessmenu
-;;
-10)
-clear
-trmenu
-;;
-11)
-clear
-trgomenu
-;;
-12)
-clear
-info
-;;
-13)
-clear
-xray version
-;;
-14)
-clear
-ipsaya
-;;
-15)
-clear
-running
-;;
-16)
-clear
-updatemenu
-;;
-17)
-clear
-sl-fix
-;;
-18)
-clear
-setmenu
-;;
-24)
-clear
-ssh-one-udp
-;;
-25)
-clear
-exit
-;;
-20)
-clear
-vnstat
-;;
-21)
-clear
-dns
-;;
-22)
-clear
-netf
-;;
-23)
-clear
-delexp && xp && restart
-;;
-19)
-clear
-htop
-;;
-*)
-clear
-menu
-;;
-esac
+#!/usr/bin/env bash
+
+# Keep optional statistics tools from delaying or hiding the menu.
+MENU_VERSION='v18'
+
+if [[ ${1:-} == --check ]]; then
+  printf 'SSH-one menu %s is ready.\n' "$MENU_VERSION"
+  exit 0
+fi
+
+if [[ -t 1 ]]; then
+  cyan=$'\033[1;36m'
+  yellow=$'\033[1;33m'
+  white=$'\033[1;37m'
+  reset=$'\033[0m'
+else
+  cyan='' yellow='' white='' reset=''
+fi
+
+read_value() {
+  local file=$1 value=''
+  if [[ -r $file ]]; then IFS= read -r value < "$file" || true; fi
+  printf '%s' "${value:-N/A}"
+}
+
+count_matches() {
+  local pattern=$1 file=$2 count
+  if [[ -r $file ]]; then
+    count=$(grep -cE "$pattern" "$file" 2>/dev/null) || count=0
+    printf '%s' "$count"
+  else
+    printf '0'
+  fi
+}
+
+server_summary() {
+  local os='Linux' uptime='N/A' cores='N/A' load='N/A' ram='N/A'
+  if [[ -r /etc/os-release ]]; then
+    os=$( . /etc/os-release; printf '%s' "${PRETTY_NAME:-Linux}" ) 2>/dev/null || os='Linux'
+  fi
+  command -v uptime >/dev/null 2>&1 && uptime -p >/dev/null 2>&1 && uptime=$(uptime -p 2>/dev/null) || true
+  command -v getconf >/dev/null 2>&1 && cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null) || true
+  [[ -r /proc/loadavg ]] && load=$(awk '{print $1}' /proc/loadavg 2>/dev/null) || true
+  command -v free >/dev/null 2>&1 && ram=$(free -m 2>/dev/null | awk 'NR==2 {printf "%s/%s MB", $3, $2}') || true
+  printf '%s  OS: %s\n' "$cyan" "${os:-Linux}"
+  printf '  Kernel: %s | Uptime: %s\n' "$(uname -r 2>/dev/null || printf 'N/A')" "${uptime:-N/A}"
+  printf '  CPU cores: %s | Load: %s | RAM: %s\n' "${cores:-N/A}" "${load:-N/A}" "${ram:-N/A}"
+  printf '  Host: %s | DNS domain: %s\n' \
+    "$(read_value /etc/ssh-one/host)" "$(read_value /etc/xray/domain)"
+  printf '  Accounts: SSH %s | VMess %s | VLESS %s | Trojan %s | Trojan-Go %s\n' \
+    "$(awk -F: '$3 >= 1000 && $1 != "nobody" {n++} END {print n+0}' /etc/passwd 2>/dev/null)" \
+    "$(count_matches '^### ' /etc/xray/config.json)" \
+    "$(count_matches '^#### ' /etc/xray/config.json)" \
+    "$(count_matches '^#&# ' /etc/xray/config.json)" \
+    "$(count_matches '^### ' /etc/trojan-go/akun.conf)"
+  printf '%s\n' "$reset"
+}
+
+show_menu() {
+  printf '%s\n' "${cyan}============================================================${reset}"
+  printf '%sSSH-one MAIN MENU (%s)%s\n' "$white" "$MENU_VERSION" "$reset"
+  server_summary
+  printf '%s\n' "${cyan}============================================================${reset}"
+  printf '%s 1%s. UDP Custom & firewall menu\n' "$yellow" "$reset"
+  printf '%s 2%s. SSH WebSocket menu\n' "$yellow" "$reset"
+  printf '%s 3%s. L2TP menu\n' "$yellow" "$reset"
+  printf '%s 4%s. PPTP menu\n' "$yellow" "$reset"
+  printf '%s 5%s. SSTP menu\n' "$yellow" "$reset"
+  printf '%s 6%s. WireGuard menu\n' "$yellow" "$reset"
+  printf '%s 7%s. Shadowsocks menu\n' "$yellow" "$reset"
+  printf '%s 8%s. ShadowsocksR menu\n' "$yellow" "$reset"
+  printf '%s 9%s. Xray VMess menu\n' "$yellow" "$reset"
+  printf '%s10%s. Xray VLESS menu\n' "$yellow" "$reset"
+  printf '%s11%s. Xray Trojan menu\n' "$yellow" "$reset"
+  printf '%s12%s. Trojan-Go menu\n' "$yellow" "$reset"
+  printf '%s13%s. Show service ports\n' "$yellow" "$reset"
+  printf '%s14%s. Check IP and ports\n' "$yellow" "$reset"
+  printf '%s15%s. Check VPN services\n' "$yellow" "$reset"
+  printf '%s16%s. Check CPU and RAM\n' "$yellow" "$reset"
+  printf '%s17%s. Check bandwidth\n' "$yellow" "$reset"
+  printf '%s18%s. DNS changer\n' "$yellow" "$reset"
+  printf '%s19%s. Netflix checker\n' "$yellow" "$reset"
+  printf '%s20%s. Delete expired users\n' "$yellow" "$reset"
+  printf '%s21%s. Update SSH-one\n' "$yellow" "$reset"
+  printf '%s22%s. Settings\n' "$yellow" "$reset"
+  printf '%s23%s. Xray version\n' "$yellow" "$reset"
+  printf '%s24%s. Fix SSLH/WebSocket after reboot\n' "$yellow" "$reset"
+  printf '%s26%s. Uninstall SSH-one\n' "$yellow" "$reset"
+  printf '%s 0%s. Exit\n' "$yellow" "$reset"
+  printf '%s\n' "${cyan}============================================================${reset}"
+}
+
+run_action() {
+  local command_name=$1
+  shift
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    printf 'Menu item unavailable: command "%s" is not installed.\n' "$command_name" >&2
+    return 127
+  fi
+  "$command_name" "$@"
+}
+
+pause_if_interactive() {
+  if [[ -t 0 ]]; then IFS= read -r -p 'Press Enter to return to the main menu...' _ || true; fi
+}
+
+while :; do
+  if [[ -t 1 && -n ${TERM:-} ]] && command -v clear >/dev/null 2>&1; then
+    clear >/dev/null 2>&1 || true
+  fi
+  show_menu
+  if ! IFS= read -r -p 'Select an option [0-26]: ' choice; then
+    printf '\nNo menu selection was received.\n' >&2
+    exit 1
+  fi
+  case $choice in
+    1) run_action ssh-one-udp ;;
+    2) run_action sshovpnmenu ;;
+    3) run_action l2tpmenu ;;
+    4) run_action pptpmenu ;;
+    5) run_action sstpmenu ;;
+    6) run_action wgmenu ;;
+    7) run_action ssmenu ;;
+    8) run_action ssrmenu ;;
+    9) run_action vmessmenu ;;
+    10) run_action vlessmenu ;;
+    11) run_action trmenu ;;
+    12) run_action trgomenu ;;
+    13) run_action info ;;
+    14) run_action ipsaya ;;
+    15) run_action running ;;
+    16) run_action htop ;;
+    17) run_action vnstat ;;
+    18) run_action dns ;;
+    19) run_action netf ;;
+    20)
+      run_action delexp && run_action xp && run_action restart
+      ;;
+    21) run_action updatemenu ;;
+    22) run_action setmenu ;;
+    23) run_action xray version ;;
+    24) run_action sl-fix ;;
+    26)
+      run_action ssh-one-uninstall
+      if [[ ! -e /etc/ssh-one/installation-complete && ! -e /etc/ssh-one/install-in-progress ]]; then
+        exit 0
+      fi
+      ;;
+    0|25) exit 0 ;;
+    *) printf 'Invalid selection: %s\n' "$choice" >&2 ;;
+  esac
+  pause_if_interactive
+done
