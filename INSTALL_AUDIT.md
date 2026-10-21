@@ -3,7 +3,7 @@
 ## เพิ่มใน v24
 
 - หัวเมนูแสดง short SHA ของ commit ที่ใช้ติดตั้งหรืออัปเดต; installer และ updater ขอ SHA จาก GitHub API แล้วดาวน์โหลด archive ที่ pin ไว้ หาก API ใช้ไม่ได้จะติดตั้งจาก branch และแสดงเลขรุ่นแทน
-- บันทึก SHA เต็มไว้ใน `/etc/ssh-one/source-commit`; updater สำรอง/กู้คืนไฟล์นี้ร่วมกับ marker รุ่นเมื่อ rollback
+- บันทึก SHA เต็มไว้ใน `/etc/ssh-one/source-commit`; updater สำรอง/กู้คืนไฟล์นี้ร่วมกับ marker รุ่นเมื่อ rollback และเมนูจะเติม SHA ให้เครื่องเดิมที่อัปเกรดจาก updater รุ่นเก่าเมื่อเปิดเมนูครั้งแรก
 - เอา prompt `Press Enter to return to the main menu...` ออกจากเมนูหลัก และปิด prompt `Press Enter to continue...` ในเมนู UDP เพื่อให้กลับไปเลือกเมนูถัดไปได้ทันที
 - เอา ♦️ ออกจากหัวตารางและแถวจำนวนบัญชี UDP/SSH/Xray ในหน้าหลัก
 - การสร้างบัญชี UDP อ่านรหัสผ่านและรหัสยืนยันแบบแสดงตัวอักษรขณะพิมพ์; หลีกเลี่ยงการกรอกรหัสผ่านที่ใช้ซ้ำกับบัญชีสำคัญอื่น

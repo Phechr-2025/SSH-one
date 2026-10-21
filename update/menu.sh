@@ -19,6 +19,36 @@ if [[ ${1:-} == --check ]]; then
   exit 0
 fi
 
+# Older installed updaters do not save the source commit. Resolve it once on
+# the first v24 menu launch, then use the local value on subsequent launches.
+if [[ $MENU_REFERENCE == "$MENU_VERSION" && -r /etc/ssh-one/repository.conf ]] &&
+   command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  source_owner=$(sed -n "s/^SSH_ONE_OWNER='\\([^']*\\)'$/\\1/p" /etc/ssh-one/repository.conf)
+  source_name=$(sed -n "s/^SSH_ONE_NAME='\\([^']*\\)'$/\\1/p" /etc/ssh-one/repository.conf)
+  source_branch=$(sed -n "s/^SSH_ONE_BRANCH='\\([^']*\\)'$/\\1/p" /etc/ssh-one/repository.conf)
+  if [[ $source_owner =~ ^[A-Za-z0-9-]+$ && $source_name =~ ^[A-Za-z0-9._-]+$ &&
+        $source_branch =~ ^[A-Za-z0-9._/-]+$ && $source_branch != *..* ]]; then
+    source_response=$(curl --fail --location --silent --connect-timeout 2 --max-time 5 \
+      --header 'Accept: application/vnd.github+json' --header 'User-Agent: SSH-one' --get \
+      --data-urlencode "sha=$source_branch" --data-urlencode 'per_page=1' \
+      "https://api.github.com/repos/$source_owner/$source_name/commits" 2>/dev/null) || source_response=''
+    source_commit=$(jq -r 'if type == "array" and length > 0 then (.[0].sha // "") else "" end' \
+      <<< "$source_response" 2>/dev/null || true)
+    if [[ $source_commit =~ ^[a-f0-9]{40}$ ]]; then
+      MENU_REFERENCE=${source_commit:0:7}
+      if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
+        source_commit_tmp="/etc/ssh-one/.source-commit.new.$$"
+        if printf '%s\n' "$source_commit" > "$source_commit_tmp" && chmod 0644 "$source_commit_tmp" &&
+           mv -fT -- "$source_commit_tmp" /etc/ssh-one/source-commit; then
+          :
+        else
+          rm -f -- "$source_commit_tmp"
+        fi
+      fi
+    fi
+  fi
+fi
+
 if [[ -t 1 ]]; then
   cyan=$'\033[1;36m'
   yellow=$'\033[1;33m'
