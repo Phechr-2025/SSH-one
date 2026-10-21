@@ -7,7 +7,7 @@ note() { printf 'SSH-one update: %s\n' "$*"; }
 [[ ${EUID:-$(id -u)} -eq 0 ]] || fail 'run this command as root.'
 [[ -r /etc/ssh-one/installation-complete ]] || fail 'SSH-one is not marked as installed on this server.'
 [[ -r /etc/ssh-one/repository.conf ]] || fail 'repository settings are missing at /etc/ssh-one/repository.conf.'
-for tool in curl unzip sha256sum flock; do command -v "$tool" >/dev/null 2>&1 || fail "$tool is required."; done
+for tool in curl unzip sha256sum flock python3; do command -v "$tool" >/dev/null 2>&1 || fail "$tool is required."; done
 
 read_setting() {
   local key=$1 file=$2
@@ -57,7 +57,7 @@ rollback() {
     fi
   done
   if (( state_touched == 1 )); then
-    for state_file in managed-files.tsv managed-files.sha256 runtime-files.sha256 installation-complete; do
+    for state_file in managed-files.tsv managed-files.sha256 runtime-files.sha256 installation-complete source-commit; do
       if [[ -f $stage_dir/state-backup/$state_file ]]; then
         if ! cp -a -- "$stage_dir/state-backup/$state_file" "/etc/ssh-one/.$state_file.restore" ||
            ! mv -fT -- "/etc/ssh-one/.$state_file.restore" "/etc/ssh-one/$state_file"; then
@@ -81,9 +81,9 @@ cleanup() {
   set +e
   if (( committed == 0 )); then rollback; fi
   rm -f -- /etc/ssh-one/.managed-files.tsv.new /etc/ssh-one/.managed-files.sha256.new \
-    /etc/ssh-one/.runtime-files.sha256.new /etc/ssh-one/.installation-complete.new \
+    /etc/ssh-one/.runtime-files.sha256.new /etc/ssh-one/.installation-complete.new /etc/ssh-one/.source-commit.new \
     /etc/ssh-one/.managed-files.tsv.restore /etc/ssh-one/.managed-files.sha256.restore \
-    /etc/ssh-one/.runtime-files.sha256.restore /etc/ssh-one/.installation-complete.restore
+    /etc/ssh-one/.runtime-files.sha256.restore /etc/ssh-one/.installation-complete.restore /etc/ssh-one/.source-commit.restore
   rm -rf -- "$stage_dir" "$work_dir"
   exit "$status"
 }
@@ -95,8 +95,26 @@ mkdir -p "$stage_dir/new" "$stage_dir/backup" "$stage_dir/state-backup"
 archive="$work_dir/source.zip"
 extract_dir="$work_dir/extracted"
 mkdir -p "$extract_dir"
-archive_url="https://codeload.github.com/${repo_owner}/${repo_name}/zip/refs/heads/${repo_branch}"
+source_commit=''
+commit_response=$(curl --fail --location --retry 2 --silent --show-error --connect-timeout 5 --max-time 15 \
+  --header 'Accept: application/vnd.github+json' --header 'User-Agent: SSH-one' --get \
+  --data-urlencode "sha=${repo_branch}" --data-urlencode 'per_page=1' \
+  "https://api.github.com/repos/${repo_owner}/${repo_name}/commits" 2>/dev/null) || commit_response=''
+if [[ -n $commit_response ]]; then
+  source_commit=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[0].get("sha", "") if isinstance(d,list) and d else "")' <<< "$commit_response" 2>/dev/null || true)
+fi
+if [[ ! $source_commit =~ ^[a-f0-9]{40}$ ]]; then
+  source_commit='unknown'
+  archive_url="https://codeload.github.com/${repo_owner}/${repo_name}/zip/refs/heads/${repo_branch}"
+else
+  archive_url="https://codeload.github.com/${repo_owner}/${repo_name}/zip/${source_commit}"
+fi
 curl --fail --location --retry 3 --silent --show-error "$archive_url" -o "$archive" || fail 'could not download the repository archive. Check outbound HTTPS and the saved GitHub settings.'
+if [[ $source_commit =~ ^[a-f0-9]{40}$ ]]; then
+  note "GitHub source reference: ${source_commit:0:7}."
+else
+  note 'GitHub commit reference unavailable; the menu will display the package version.'
+fi
 unzip -q "$archive" -d "$extract_dir" || fail 'the downloaded repository archive could not be extracted.'
 mapfile -t version_files < <(find "$extract_dir" -mindepth 2 -maxdepth 3 -type f -name VERSION -print)
 (( ${#version_files[@]} == 1 )) || fail 'the archive must contain exactly one project VERSION file.'
@@ -175,7 +193,7 @@ for target in "${!new_target[@]}"; do
   mv -fT -- "$stage_dir/new/$target" "/usr/bin/$target" || fail "could not install $target; rolling back."
 done
 
-for state_file in managed-files.tsv managed-files.sha256 runtime-files.sha256 installation-complete; do
+for state_file in managed-files.tsv managed-files.sha256 runtime-files.sha256 installation-complete source-commit; do
   if [[ -f /etc/ssh-one/$state_file ]]; then cp -a -- "/etc/ssh-one/$state_file" "$stage_dir/state-backup/$state_file"; fi
 done
 install -m 0644 -- "$manifest" "$stage_dir/managed-files.tsv" || fail 'could not prepare the file inventory.'
@@ -187,9 +205,12 @@ done
 install -m 0644 -- "$stage_dir/managed-files.tsv" /etc/ssh-one/.managed-files.tsv.new || fail 'could not write the file inventory.'
 install -m 0644 -- "$stage_dir/managed-files.sha256" /etc/ssh-one/.managed-files.sha256.new || fail 'could not write the command checksums.'
 printf '%s\n' "$release_version" > /etc/ssh-one/.installation-complete.new || fail 'could not prepare the version marker.'
+printf '%s\n' "$source_commit" > /etc/ssh-one/.source-commit.new || fail 'could not prepare the GitHub source reference.'
+chmod 0644 /etc/ssh-one/.source-commit.new || fail 'could not set permissions on the GitHub source reference.'
 state_touched=1
 mv -fT -- /etc/ssh-one/.managed-files.tsv.new /etc/ssh-one/managed-files.tsv || fail 'could not activate the file inventory.'
 mv -fT -- /etc/ssh-one/.managed-files.sha256.new /etc/ssh-one/managed-files.sha256 || fail 'could not activate the command checksums.'
+mv -fT -- /etc/ssh-one/.source-commit.new /etc/ssh-one/source-commit || fail 'could not activate the GitHub source reference.'
 if [[ ! -s /etc/ssh-one/runtime-files.sha256 ]]; then
   : > /etc/ssh-one/.runtime-files.sha256.new
   for runtime_path in /usr/local/bin/xray /usr/local/bin/trojan-go /usr/local/bin/ws-tls /usr/local/bin/ws-nontls /usr/local/bin/ws-ovpn /usr/local/bin/ohpserver /bin/udpgw /root/udp/udp-custom; do

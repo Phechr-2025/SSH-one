@@ -33,9 +33,9 @@ fi
 raw_base="https://raw.githubusercontent.com/${repo_owner}/${repo_name}/${repo_branch}"
 udp_group='ssh-one-udp'
 default_udp_exclusions='500,1701,2200,4500,7070'
+# Keep action call sites simple while returning to the menu immediately.
 pause() {
-  local unused
-  read -r -p 'Press Enter to continue...' unused || true
+  :
 }
 
 wait_for_udp_custom() {
@@ -553,10 +553,9 @@ create_udp_user() {
     return 1
   fi
   printf 'Password (any non-empty length; colon is not allowed): '
-  IFS= read -r -s password || return 0
-  printf '\nConfirm password: '
-  IFS= read -r -s confirmation || return 0
-  printf '\n'
+  IFS= read -r password || return 0
+  printf 'Confirm password: '
+  IFS= read -r confirmation || return 0
   if [[ -z $password || $password == *:* || $password != "$confirmation" ]]; then
     unset password confirmation
     fail 'Passwords must match, must not be empty, and must not contain a colon.'
@@ -655,8 +654,10 @@ restart_udp() {
   pause
 }
 
+first_menu_iteration=1
 while true; do
-  clear 2>/dev/null || true
+  if (( first_menu_iteration )) && [[ -t 1 ]] && command -v clear >/dev/null 2>&1; then clear 2>/dev/null || true; fi
+  first_menu_iteration=0
   printf '%s\n' '================ SSH-one UDP & Port Menu ================'
   printf '%s\n' '1. Open port(s) in host firewall (default UDP 1-65535; customizable)'
   printf '%s\n' '2. Change UDP Custom listener port (default 36712)'

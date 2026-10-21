@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 
 # Keep optional statistics tools from delaying or hiding the menu.
-MENU_VERSION='v23'
+MENU_VERSION='v24'
 if [[ -r /etc/ssh-one/installation-complete ]]; then
   installed_menu_version=''
   IFS= read -r installed_menu_version < /etc/ssh-one/installation-complete || true
   [[ $installed_menu_version =~ ^v[0-9]+$ ]] && MENU_VERSION=$installed_menu_version
+fi
+MENU_REFERENCE=$MENU_VERSION
+if [[ -r /etc/ssh-one/source-commit ]]; then
+  installed_source_commit=''
+  IFS= read -r installed_source_commit < /etc/ssh-one/source-commit || true
+  [[ $installed_source_commit =~ ^[a-f0-9]{40}$ ]] && MENU_REFERENCE=${installed_source_commit:0:7}
 fi
 
 if [[ ${1:-} == --check ]]; then
@@ -133,8 +139,8 @@ server_summary() {
   bandwidth_summary
   printf '%s\n' "${cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}"
   printf '%s♦️ Accounts ♦️%s\n' "$white" "$reset"
-  printf '♦️ %-6s %-7s %-8s %-7s %-8s %-9s\n' 'UDP' 'SSH' 'VMESS' 'VLESS' 'TROJAN' 'TROJANGO'
-  printf '♦️ %-6s %-7s %-8s %-7s %-8s %-9s\n' "$udp_accounts" "${ssh_accounts:-0}" \
+  printf '%-6s %-7s %-8s %-7s %-8s %-9s\n' 'UDP' 'SSH' 'VMESS' 'VLESS' 'TROJAN' 'TROJANGO'
+  printf '%-6s %-7s %-8s %-7s %-8s %-9s\n' "$udp_accounts" "${ssh_accounts:-0}" \
     "$(count_matches '^### ' /etc/xray/config.json)" \
     "$(count_matches '^#### ' /etc/xray/config.json)" \
     "$(count_matches '^#&# ' /etc/xray/config.json)" \
@@ -169,7 +175,7 @@ show_service_ports() {
 
 show_menu() {
   printf '%s\n' "${cyan}============================================================${reset}"
-  printf '%sSSH-one MAIN MENU (%s)%s\n' "$white" "$MENU_VERSION" "$reset"
+  printf '%sSSH-one MAIN MENU (%s)%s\n' "$white" "$MENU_REFERENCE" "$reset"
   server_summary
   printf '%s\n' "${cyan}============================================================${reset}"
   printf '%s 1%s. UDP Custom & firewall menu\n' "$yellow" "$reset"
@@ -211,14 +217,12 @@ run_action() {
   "$command_name" "$@"
 }
 
-pause_if_interactive() {
-  if [[ -t 0 ]]; then IFS= read -r -p 'Press Enter to return to the main menu...' _ || true; fi
-}
-
+first_menu_iteration=1
 while :; do
-  if [[ -t 1 && -n ${TERM:-} ]] && command -v clear >/dev/null 2>&1; then
+  if (( first_menu_iteration )) && [[ -t 1 && -n ${TERM:-} ]] && command -v clear >/dev/null 2>&1; then
     clear >/dev/null 2>&1 || true
   fi
+  first_menu_iteration=0
   show_menu
   if ! IFS= read -r -p 'Select an option [0-26]: ' choice; then
     printf '\nNo menu selection was received.\n' >&2
@@ -260,5 +264,4 @@ while :; do
     0|25) exit 0 ;;
     *) printf 'Invalid selection: %s\n' "$choice" >&2 ;;
   esac
-  pause_if_interactive
 done

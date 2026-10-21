@@ -25,7 +25,7 @@
 
 > **ใช้กับ VPS ใหม่เท่านั้น** ไม่รองรับอัปเกรดหรือติดตั้งต่อจากงานที่ค้าง
 
-1. แตก ZIP แล้วอัปโหลด **ไฟล์และโฟลเดอร์ข้างใน** ไว้ที่รากของ repository อย่าวางในโฟลเดอร์ <code>SSH-one-v23</code>
+1. แตก ZIP แล้วอัปโหลด **ไฟล์และโฟลเดอร์ข้างใน** ไว้ที่รากของ repository อย่าวางในโฟลเดอร์ <code>SSH-one-v24</code>
 2. ใช้ repository ชื่อ <code>Phechr-2025/SSH-one</code> และ branch <code>main</code> หรือแก้ชื่อในคำสั่งติดตั้งให้ตรง repository ของคุณ
 3. เข้า VPS ด้วยบัญชี <code>root</code> แล้วรัน:
 
@@ -43,13 +43,13 @@
 
 ## อัปเดตและถอนการติดตั้ง
 
-ถ้าเครื่องเดิมยังเป็น v17 ให้เริ่มอัปเดตด้วย bootstrap รุ่น v23 นี้ (ถ้าเปลี่ยน repository ให้แก้ URL ให้ตรงด้วย):
+ถ้าเครื่องเดิมยังเป็น v17 ให้เริ่มอัปเดตด้วย bootstrap รุ่น v24 นี้ (ถ้าเปลี่ยน repository ให้แก้ URL ให้ตรงด้วย):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/update/updatemenu.sh)
 ```
 
-ถ้า v18 หยุดด้วยข้อความ <code>a pre-existing command has no safe backup: /usr/bin/about</code> ให้อัปโหลดไฟล์ v23 ขึ้น repository ก่อน แล้วรันคำสั่งกู้คืนนี้บน VPS เดิม คำสั่งนี้ลงทะเบียนคำสั่ง/เมนูที่ขาดต่อจากจุดติดตั้งเดิม โดยไม่ติดตั้งบริการซ้ำ:
+ถ้า v18 หยุดด้วยข้อความ <code>a pre-existing command has no safe backup: /usr/bin/about</code> ให้อัปโหลดไฟล์ v24 ขึ้น repository ก่อน แล้วรันคำสั่งกู้คืนนี้บน VPS เดิม คำสั่งนี้ลงทะเบียนคำสั่ง/เมนูที่ขาดต่อจากจุดติดตั้งเดิม โดยไม่ติดตั้งบริการซ้ำ:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/recover-v18.sh)
@@ -59,6 +59,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/rec
 - อัปเดตไฟล์คำสั่งและเมนูที่ระบุใน <code>update/managed-files.tsv</code> รวมถึงตัวอัปเดต/ถอนติดตั้ง บันทึก checksum ไว้ใช้ตรวจไฟล์ค้างและคืนไฟล์เดิมที่มีอยู่ก่อนติดตั้ง หากเครื่อง v17 ไม่มีคำสั่ง <code>menu</code> ให้ใช้ bootstrap ด้านบนก่อน แล้วลอง <code>/usr/bin/menu</code>
 - การอัปเดตนี้ไม่เปลี่ยนบัญชี/ไฟล์ตั้งค่าบริการ, firewall, แพ็กเกจระบบ หรือไบนารี VPN ที่ดาวน์โหลดจาก upstream แยกต่างหาก
 - เมนูแสดงรุ่นจาก marker ที่บันทึกหลังติดตั้ง/อัปเดต; หน้าหลักเพิ่มข้อมูลเครื่อง, bandwidth รายวัน/เมื่อวาน/เดือนนี้ และจำนวนบัญชี ส่วนข้อ **13** แสดงตารางพอร์ต
+- หัวเมนูแสดง short SHA ของ commit ที่ใช้ติดตั้ง/อัปเดตเมื่อ GitHub API ติดต่อได้; ตารางจำนวนบัญชีไม่มีสัญลักษณ์ ♦️ และเมนูไม่ถามให้กด Enter หลังทำรายการ
+- ช่องรหัสผ่านและยืนยันรหัสผ่านของบัญชี UDP Custom แสดงตัวอักษรระหว่างพิมพ์
 - ถอนจากเมนูหลักข้อ **26** หรือรัน <code>ssh-one-uninstall</code> ด้วย root แล้วพิมพ์ <code>UNINSTALL</code> สคริปต์จะหยุดเฉพาะ service unit ที่ตรวจพบว่าเรียกไฟล์ของ SSH-one และลบไฟล์ที่ checksum ยังตรงกับไฟล์ที่ติดตั้งไว้ หากมีไฟล์เดิมอยู่ก่อนจะคืนไฟล์นั้น
 - การถอนลบข้อมูล/บัญชีใน <code>/etc/xray</code>, <code>/etc/trojan-go</code>, <code>/etc/wireguard</code>, <code>/root/udp</code> และ <code>/var/lib/crot</code> ซึ่งเป็นโฟลเดอร์ข้อมูลของบริการชุดนี้ สำรองข้อมูลก่อนถอน
 - เพื่อรักษาการเข้าถึง VPS ระบบจะเก็บ OpenSSH, แพ็กเกจ apt, Linux user ที่ไม่บันทึกเจ้าของ, กฎ firewall ที่ไม่มีป้าย SSH-one และไฟล์ที่ถูกแก้หลังติดตั้งไว้ การถอนจึงไม่สามารถลบรายการเหล่านี้โดยเดาได้อย่างปลอดภัย

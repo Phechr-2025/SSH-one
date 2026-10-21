@@ -63,7 +63,7 @@ if ! install -d -m 0755 /etc/ssh-one; then
 	report_error "Could not create the SSH-one state directory."
 	exit 1
 fi
-if ! printf 'v23 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
+if ! printf 'v24 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
 	report_error "Could not write the installation-in-progress marker."
 	exit 1
 fi
@@ -325,7 +325,12 @@ if passwd -S root 2>/dev/null | awk '$2 == "L" || $2 == "NP" { locked=1 } END { 
 	report_error "Warning: root has no usable password; password login cannot work until you set one in the VPS console. SSH key access may still work."
 fi
 
-printf 'v23\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
+source_commit=${SSH_ONE_SOURCE_COMMIT:-unknown}
+if [[ ! $source_commit =~ ^[a-f0-9]{40}$ ]]; then source_commit='unknown'; fi
+printf '%s\n' "$source_commit" > /etc/ssh-one/.source-commit.new || { report_error "Could not prepare the GitHub source reference."; exit 1; }
+chmod 0644 /etc/ssh-one/.source-commit.new || { report_error "Could not set permissions on the GitHub source reference."; exit 1; }
+mv -fT -- /etc/ssh-one/.source-commit.new /etc/ssh-one/source-commit || { report_error "Could not activate the GitHub source reference."; exit 1; }
+printf 'v24\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
 mv -fT -- /etc/ssh-one/.installation-complete.new /etc/ssh-one/installation-complete || { report_error "Could not activate the installation marker."; exit 1; }
 rm -f /etc/ssh-one/install-in-progress || { report_error "Could not remove the installation-in-progress marker."; exit 1; }
 printf 'Installation complete. SSH config and TCP 22/2253 listeners passed checks. VPS will reboot in 10 seconds.\n' | tee -a /root/log-install.txt

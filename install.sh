@@ -107,7 +107,7 @@ touch /root/log-install.txt || fail 'cannot create /root/log-install.txt.'
 command -v flock >/dev/null 2>&1 || fail 'flock is required; install util-linux and try again.'
 exec 9>/run/lock/ssh-one-install.lock || fail 'cannot create the SSH-one installation lock.'
 flock -n 9 || fail 'another SSH-one installation is already running.'
-printf '\n==== SSH-one v19 install attempt: %s ====\n' "$(date -Is)" >> /root/log-install.txt
+printf '\n==== SSH-one v24 install attempt: %s ====\n' "$(date -Is)" >> /root/log-install.txt
 
 if [[ -e /etc/ssh-one/installation-complete ]]; then
   fail 'SSH-one is already installed. This installer will not run a second time.'
@@ -159,10 +159,31 @@ work_dir=$(mktemp -d /tmp/ssh-one.XXXXXX)
 cleanup() { rm -rf -- "$work_dir"; }
 trap cleanup EXIT
 archive="$work_dir/ssh-one.zip"
-curl --fail --location --retry 3 --output "$archive" \
-  "https://codeload.github.com/${repo_owner}/${repo_name}/zip/refs/heads/${repo_branch}"
+source_commit=''
+commit_response=$(curl --fail --location --retry 2 --silent --show-error --connect-timeout 5 --max-time 15 \
+  --header 'Accept: application/vnd.github+json' --header 'User-Agent: SSH-one' --get \
+  --data-urlencode "sha=${repo_branch}" --data-urlencode 'per_page=1' \
+  "https://api.github.com/repos/${repo_owner}/${repo_name}/commits" 2>/dev/null) || commit_response=''
+if [[ -n $commit_response ]]; then
+  source_commit=$(jq -r 'if type == "array" and length > 0 then (.[0].sha // "") else "" end' <<< "$commit_response" 2>/dev/null || true)
+fi
+if [[ ! $source_commit =~ ^[a-f0-9]{40}$ ]]; then source_commit='unknown'; fi
+if [[ $source_commit == unknown ]]; then
+  printf 'Could not resolve the latest GitHub commit; downloading the configured branch directly.\n' >&2
+  archive_url="https://codeload.github.com/${repo_owner}/${repo_name}/zip/refs/heads/${repo_branch}"
+else
+  archive_url="https://codeload.github.com/${repo_owner}/${repo_name}/zip/${source_commit}"
+fi
+curl --fail --location --retry 3 --output "$archive" "$archive_url"
+if [[ $source_commit =~ ^[a-f0-9]{40}$ ]]; then
+  printf 'GitHub source reference: %s\n' "${source_commit:0:7}"
+else
+  printf 'GitHub commit reference unavailable; menu will display the package version.\n'
+fi
 unzip -q "$archive" -d "$work_dir"
-source_dir="$work_dir/${repo_name}-${repo_branch}"
+mapfile -t version_files < <(find "$work_dir" -mindepth 2 -maxdepth 3 -type f -name VERSION -print)
+(( ${#version_files[@]} == 1 )) || fail 'repository archive must contain exactly one project VERSION file.'
+source_dir=${version_files[0]%/VERSION}
 [[ -f "$source_dir/setup.sh" ]] || fail 'repository archive does not contain setup.sh.'
 [[ -f "$source_dir/repository.conf" ]] || fail 'repository archive does not contain repository.conf.'
 install -d -m 0755 /etc/ssh-one
@@ -171,6 +192,7 @@ unset SSH_ONE_OWNER SSH_ONE_NAME SSH_ONE_BRANCH
 [[ $SSH_ONE_OWNER == "$repo_owner" && $SSH_ONE_NAME == "$repo_name" && $SSH_ONE_BRANCH == "$repo_branch" ]] || fail 'repository.conf must match the owner, repository and branch passed to install.sh.'
 install -m 0644 "$source_dir/repository.conf" /etc/ssh-one/repository.conf
 export SSH_ONE_OWNER SSH_ONE_NAME SSH_ONE_BRANCH
+export SSH_ONE_SOURCE_COMMIT="$source_commit"
 cd "$source_dir"
 if ! bash ./setup.sh; then
   fail 'setup.sh failed. The VPS may now be partially configured; see the error above and /root/log-install.txt.'
