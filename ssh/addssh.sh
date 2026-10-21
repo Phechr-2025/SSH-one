@@ -17,9 +17,6 @@ LIGHT='\033[0;37m'
 # Getting
 
 domain=$(cat /etc/xray/domain)
-sldomain=$(cat /root/nsdomain)
-cdndomain=$(cat /root/awscdndomain)
-slkey=$(cat /etc/slowdns/server.pub)
 clear
 read -p "Username : " Login
 read -p "Password : " Pass
@@ -37,21 +34,19 @@ sqd="$(cat ~/log-install.txt | grep -w "Squid" | cut -d: -f2)"
 ovpn="$(netstat -nlpt | grep -i openvpn | grep -i 0.0.0.0 | awk '{print $4}' | cut -d: -f2)"
 ovpn2="$(netstat -nlpu | grep -i openvpn | grep -i 0.0.0.0 | awk '{print $4}' | cut -d: -f2)"
 clear
-systemctl stop client-sldns
-systemctl stop server-sldns
-pkill sldns-server
-pkill sldns-client
-systemctl enable client-sldns
-systemctl enable server-sldns
-systemctl start client-sldns
-systemctl start server-sldns
-systemctl restart client-sldns
-systemctl restart server-sldns
-systemctl restart ws-tls
-systemctl restart ws-nontls
-systemctl restart ssh-ohp
-systemctl restart dropbear-ohp
-systemctl restart openvpn-ohp
+# SlowDNS is not installed by SSH-one. Restart optional services only when
+# their unit exists and is already active; account creation must not emit
+# failures for services this installer intentionally skipped.
+restart_active_service() {
+	local unit=$1
+	if systemctl list-unit-files --type=service --no-legend "$unit.service" 2>/dev/null | grep -q "^${unit}\.service" &&
+	   systemctl is-active --quiet "$unit.service"; then
+		systemctl restart "$unit.service" >/dev/null 2>&1 || echo "Warning: could not restart $unit.service." >&2
+	fi
+}
+for optional_service in ws-tls ws-nontls ssh-ohp dropbear-ohp openvpn-ohp; do
+	restart_active_service "$optional_service"
+done
 if ! getent group ssh-one-ssh >/dev/null 2>&1; then groupadd --system ssh-one-ssh || { echo "Could not create the SSH account group." >&2; exit 1; }; fi
 useradd -e "$(date -d "$masaaktif days" +"%Y-%m-%d")" -s /bin/false -M -G ssh-one-ssh "$Login" || { echo "Could not create the SSH account." >&2; exit 1; }
 expi="$(chage -l $Login | grep "Account expires" | awk -F": " '{print $2}')"
@@ -79,11 +74,7 @@ Expired: $expi
 ===========HOST-SSH===========
 IP/Host: $IP
 Domain SSH: $domain
-Domain Name System(DNS): 8.8.8.8
-Name Server(NS): $sldomain
-DNS PUBLIC KEY: $slkey
 =========Service-Port=========
-SlowDNS: 443,22,109,143
 OpenSSH: 22
 Dropbear: 443, 109, 143
 SSL/TLS: 443
@@ -121,11 +112,7 @@ echo -e "Expired: $expi"
 echo -e "===========HOST-SSH==========="
 echo -e "IP/Host: $IP"
 echo -e "Domain SSH: $domain"
-echo -e "Domain Name System(DNS): 8.8.8.8"
-echo -e "Name Server(NS): $sldomain"
-echo -e "DNS PUBLIC KEY: $slkey"
 echo -e "=========Service-Port========="
-echo -e "SlowDNS: 443,22,109,143"
 echo -e "OpenSSH: 22"
 echo -e "Dropbear: 443, 109, 143"
 echo -e "SSL/TLS: 443"

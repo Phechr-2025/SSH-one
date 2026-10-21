@@ -1,4 +1,6 @@
 # source	target (under /usr/bin)	mode	type
+api/ssh-one-api.py	ssh-one-api	0755	python
+api/token-menu.sh	ssh-one-api-tokens	0755	shell
 ssh/about.sh	about	0755	shell
 ssh/addhost.sh	addhost	0755	shell
 ssh/addssh.sh	addssh	0755	shell

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Keep optional statistics tools from delaying or hiding the menu.
-MENU_VERSION='v25'
+MENU_VERSION='v26'
 if [[ -r /etc/ssh-one/installation-complete ]]; then
   installed_menu_version=''
   IFS= read -r installed_menu_version < /etc/ssh-one/installation-complete || true
@@ -253,25 +253,31 @@ show_menu() {
   printf '%s23%s. Xray version\n' "$yellow" "$reset"
   printf '%s24%s. Fix SSLH/WebSocket after reboot\n' "$yellow" "$reset"
   printf '%s26%s. Uninstall SSH-one\n' "$yellow" "$reset"
+  printf '%s27%s. API token management\n' "$yellow" "$reset"
   printf '%s 0%s. Exit\n' "$yellow" "$reset"
   printf '%s\n' "${cyan}============================================================${reset}"
 }
 
 run_action() {
-  local command_name=$1 status marker=/run/ssh-one/account-created show_after=0
+  local command_name=$1 status
   shift
   if ! command -v "$command_name" >/dev/null 2>&1; then
     printf 'Menu item unavailable: command "%s" is not installed.\n' "$command_name" >&2
     return 127
   fi
-  rm -f -- "$marker" 2>/dev/null || true
   if SSH_ONE_MENU_ACTIVE=1 "$command_name" "$@"; then status=0; else status=$?; fi
-  if [[ -s $marker ]]; then
-    rm -f -- "$marker"
-    [[ -r /etc/ssh-one/menu-after-create ]] && IFS= read -r show_after < /etc/ssh-one/menu-after-create || true
-    [[ $show_after == 1 ]] || exit 0
-  fi
   return "$status"
+}
+
+show_menu_after_action() {
+  local setting=0
+  if [[ -r /etc/ssh-one/menu-after-action ]]; then
+    IFS= read -r setting < /etc/ssh-one/menu-after-action || true
+  elif [[ -r /etc/ssh-one/menu-after-create ]]; then
+    # Keep v25's preference when the first v26 menu is opened.
+    IFS= read -r setting < /etc/ssh-one/menu-after-create || true
+  fi
+  [[ $setting == 1 ]]
 }
 
 first_menu_iteration=1
@@ -281,7 +287,7 @@ while :; do
   fi
   first_menu_iteration=0
   show_menu
-  if ! IFS= read -r -p 'Select an option [0-26]: ' choice; then
+  if ! IFS= read -r -p 'Select an option [0-27]: ' choice; then
     printf '\nNo menu selection was received.\n' >&2
     exit 1
   fi
@@ -318,7 +324,15 @@ while :; do
         exit 0
       fi
       ;;
+    27) run_action ssh-one-api-tokens ;;
     0|25) exit 0 ;;
     *) printf 'Invalid selection: %s\n' "$choice" >&2 ;;
+  esac
+  action_status=$?
+  if (( action_status == 99 )); then continue; fi
+  case $choice in
+    1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|26|27)
+      show_menu_after_action || exit 0
+      ;;
   esac
 done

@@ -27,6 +27,8 @@ work_dir=$(mktemp -d /tmp/ssh-one-update.XXXXXX) || fail 'could not create a tem
 stage_dir=$(mktemp -d /usr/bin/.ssh-one-update.XXXXXX) || { rm -rf -- "$work_dir"; fail 'could not stage files under /usr/bin.'; }
 committed=0
 state_touched=0
+api_unit_preexisting=0
+[[ -e /etc/systemd/system/ssh-one-api.service || -L /etc/systemd/system/ssh-one-api.service ]] && api_unit_preexisting=1
 declare -a changed_targets=() removed_targets=()
 declare -A target_had_file=() new_target=() previous_hash=()
 
@@ -80,6 +82,14 @@ cleanup() {
   trap - EXIT INT TERM
   set +e
   if (( committed == 0 )); then rollback; fi
+  if (( committed == 0 && api_unit_preexisting == 0 )) &&
+     [[ -f /etc/systemd/system/ssh-one-api.service ]] &&
+     grep -Fqx '# SSH-one managed API service' /etc/systemd/system/ssh-one-api.service; then
+    systemctl disable --now ssh-one-api.service >/dev/null 2>&1 || true
+    rm -f -- /etc/systemd/system/ssh-one-api.service \
+      /etc/systemd/system/multi-user.target.wants/ssh-one-api.service
+    systemctl daemon-reload >/dev/null 2>&1 || true
+  fi
   rm -f -- /etc/ssh-one/.managed-files.tsv.new /etc/ssh-one/.managed-files.sha256.new \
     /etc/ssh-one/.runtime-files.sha256.new /etc/ssh-one/.installation-complete.new /etc/ssh-one/.source-commit.new \
     /etc/ssh-one/.managed-files.tsv.restore /etc/ssh-one/.managed-files.sha256.restore \
@@ -192,6 +202,12 @@ for target in "${!new_target[@]}"; do
   changed_targets+=("$target")
   mv -fT -- "$stage_dir/new/$target" "/usr/bin/$target" || fail "could not install $target; rolling back."
 done
+
+# v26 adds the loopback API service. Install/update its systemd unit from the
+# newly installed command; the listener never binds to a public address.
+if [[ -x /usr/bin/ssh-one-api ]]; then
+  /usr/bin/ssh-one-api --install-service || fail 'could not install or start the SSH-one API service.'
+fi
 
 for state_file in managed-files.tsv managed-files.sha256 runtime-files.sha256 installation-complete source-commit; do
   if [[ -f /etc/ssh-one/$state_file ]]; then cp -a -- "/etc/ssh-one/$state_file" "$stage_dir/state-backup/$state_file"; fi

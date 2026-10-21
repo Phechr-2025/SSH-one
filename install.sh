@@ -142,7 +142,7 @@ virt=$(systemd-detect-virt 2>/dev/null || true)
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y ca-certificates curl jq unzip wget screen
+apt-get install -y ca-certificates curl jq python3 unzip wget screen
 
 detect_public_ipv4
 printf 'Checking public DNS for %s against this VPS...\n' "$SSH_ONE_DOMAIN_HOST"

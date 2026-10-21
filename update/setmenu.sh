@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-setting_file=/etc/ssh-one/menu-after-create
+setting_file=/etc/ssh-one/menu-after-action
 setting=0
-if [[ -r $setting_file ]]; then IFS= read -r setting < "$setting_file" || true; fi
+if [[ -r $setting_file ]]; then IFS= read -r setting < "$setting_file" || true
+elif [[ -r /etc/ssh-one/menu-after-create ]]; then IFS= read -r setting < /etc/ssh-one/menu-after-create || true
+fi
 [[ $setting == 1 ]] || setting=0
 
 printf '%s\n' 'SYSTEM SETTINGS'
@@ -29,9 +31,9 @@ printf '%s\n' '18. Restore SSH + SSL/TLS port 443'
 printf '%s\n' '19. Swap RAM menu'
 printf '%s\n' '20. Main menu'
 if [[ $setting == 1 ]]; then
-  printf '%s\n' '21. Show menu after account creation [ON]'
+  printf '%s\n' '21. Return to main menu after every action [ON]'
 else
-  printf '%s\n' '21. Show menu after account creation [OFF]'
+  printf '%s\n' '21. Return to main menu after every action [OFF]'
 fi
 printf '%s\n' '-------------------------------------------------------------'
 read -r -p 'Select an option [1-21]: ' choice || exit 0
@@ -58,11 +60,11 @@ case $choice in
   19) wget -q -O /usr/bin/swapram 'https://raw.githubusercontent.com/NevermoreSSH/swapram/main/swapram.sh' && chmod +x /usr/bin/swapram && swapram ;;
   20) exit 0 ;;
   21)
-    tmp=$(mktemp /etc/ssh-one/.menu-after-create.XXXXXX)
+    tmp=$(mktemp /etc/ssh-one/.menu-after-action.XXXXXX)
     if [[ $setting == 1 ]]; then printf '0\n' > "$tmp"; else printf '1\n' > "$tmp"; fi
     chmod 0644 "$tmp"
     mv -fT -- "$tmp" "$setting_file"
-    if [[ $setting == 1 ]]; then printf 'Menu after account creation: OFF\n'; else printf 'Menu after account creation: ON\n'; fi
+    if [[ $setting == 1 ]]; then printf 'Return to main menu after every action: OFF\n'; else printf 'Return to main menu after every action: ON\n'; fi
     ;;
   *) printf 'Invalid option.\n' >&2 ;;
 esac

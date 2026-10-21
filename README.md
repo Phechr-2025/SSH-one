@@ -1,5 +1,7 @@
 # SSH-one
 
+**ภาษา / Language:** [ไทย](README.md) | [English](README_EN.md)
+
 <div align="center">
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
   <br><br>
@@ -19,13 +21,14 @@
 - [ค่าที่ตัวติดตั้งถาม](#ค่าที่ตัวติดตั้งถาม)
 - [ระบบและบริการที่รองรับ](#ระบบและบริการที่รองรับ)
 - [อัปเดตและถอนการติดตั้ง](#อัปเดตและถอนการติดตั้ง)
+- [API สำหรับระบบขาย](#api-สำหรับระบบขาย)
 - [ข้อจำกัดที่ควรรู้](#ข้อจำกัดที่ควรรู้)
 
 ## ติดตั้งแบบรวดเร็ว
 
 > **ใช้กับ VPS ใหม่เท่านั้น** ไม่รองรับอัปเกรดหรือติดตั้งต่อจากงานที่ค้าง
 
-1. แตก ZIP แล้วอัปโหลด **ไฟล์และโฟลเดอร์ข้างใน** ไว้ที่รากของ repository อย่าวางในโฟลเดอร์ <code>SSH-one-v25</code>
+1. แตก ZIP แล้วอัปโหลด **ไฟล์และโฟลเดอร์ข้างใน** ไว้ที่รากของ repository อย่าวางในโฟลเดอร์ <code>SSH-one-v26</code>
 2. ใช้ repository ชื่อ <code>Phechr-2025/SSH-one</code> และ branch <code>main</code> หรือแก้ชื่อในคำสั่งติดตั้งให้ตรง repository ของคุณ
 3. เข้า VPS ด้วยบัญชี <code>root</code> แล้วรัน:
 
@@ -43,13 +46,13 @@
 
 ## อัปเดตและถอนการติดตั้ง
 
-ถ้าเครื่องเดิมยังเป็น v17 ให้เริ่มอัปเดตด้วย bootstrap รุ่น v25 นี้ (ถ้าเปลี่ยน repository ให้แก้ URL ให้ตรงด้วย):
+ถ้าเครื่องเดิมยังเป็น v17 ให้เริ่มอัปเดตด้วย bootstrap รุ่น v26 นี้ (ถ้าเปลี่ยน repository ให้แก้ URL ให้ตรงด้วย):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/update/updatemenu.sh)
 ```
 
-ถ้า v18 หยุดด้วยข้อความ <code>a pre-existing command has no safe backup: /usr/bin/about</code> ให้อัปโหลดไฟล์ v25 ขึ้น repository ก่อน แล้วรันคำสั่งกู้คืนนี้บน VPS เดิม คำสั่งนี้ลงทะเบียนคำสั่ง/เมนูที่ขาดต่อจากจุดติดตั้งเดิม โดยไม่ติดตั้งบริการซ้ำ:
+ถ้า v18 หยุดด้วยข้อความ <code>a pre-existing command has no safe backup: /usr/bin/about</code> ให้อัปโหลดไฟล์ v26 ขึ้น repository ก่อน แล้วรันคำสั่งกู้คืนนี้บน VPS เดิม คำสั่งนี้ลงทะเบียนคำสั่ง/เมนูที่ขาดต่อจากจุดติดตั้งเดิม โดยไม่ติดตั้งบริการซ้ำ:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/recover-v18.sh)
@@ -63,12 +66,21 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/rec
 - บัญชี SSH กับ UDP แยกกลุ่มและนับแยกกัน; รายการ SSH ไม่รวมบัญชี UDP
 - สร้างบัญชี UDP โดยใส่ชื่อ รหัสผ่าน และจำนวนวัน ระบบบันทึกเวลาหมดอายุจากเวลาสร้างและลบอัตโนมัติ โดยตรวจทุก 15 วินาที
 - UDP Custom รุ่นที่รวมมาไม่รายงานชื่อผู้ใช้ที่กำลังเชื่อมต่อ จึงแสดงสถานะบริการแทนรายชื่อผู้ใช้ออนไลน์
-- เมนูหลังสรุปบัญชีปิดเป็นค่าเริ่มต้น; เปลี่ยนได้ที่ **22. Settings → 21. Show menu after account creation**
+- เมนูหลักหลังทำรายการทุกชนิดปิดเป็นค่าเริ่มต้น; เปลี่ยนได้ที่ **22. Settings → 21. Return to main menu after every action** การดูรายชื่อบัญชี สถานะบริการ และเมนูย่อยใช้ค่านี้ด้วย
+- API v1 ฟังเฉพาะ `127.0.0.1:8765`; เชื่อมผ่าน SSH tunnel แล้วแนบ API token ทุก request คู่มือทั้งสองภาษา: [ภาษาไทย](API_GUIDE_TH.md) · [English](API_GUIDE_EN.md)
 - การติดตั้งใหม่ไม่สร้างบัญชี `vps` หรือบัญชีบริการเริ่มต้นใน Xray, Trojan-Go, Shadowsocks, SSR, IPsec/PPTP; บัญชีระบบที่ OS ต้องใช้ เช่น `root` และ `www-data` ยังคงอยู่
 - บัญชี UDP ที่สร้างก่อน v25 ไม่มีเวลาหมดอายุที่บันทึกไว้ จะแสดง `not tracked`; ลบแล้วสร้างใหม่เพื่อกำหนดวันหมดอายุ
 - ถอนจากเมนูหลักข้อ **26** หรือรัน <code>ssh-one-uninstall</code> ด้วย root แล้วพิมพ์ <code>UNINSTALL</code> สคริปต์จะหยุดเฉพาะ service unit ที่ตรวจพบว่าเรียกไฟล์ของ SSH-one และลบไฟล์ที่ checksum ยังตรงกับไฟล์ที่ติดตั้งไว้ หากมีไฟล์เดิมอยู่ก่อนจะคืนไฟล์นั้น
 - การถอนลบข้อมูล/บัญชีใน <code>/etc/xray</code>, <code>/etc/trojan-go</code>, <code>/etc/wireguard</code>, <code>/root/udp</code> และ <code>/var/lib/crot</code> ซึ่งเป็นโฟลเดอร์ข้อมูลของบริการชุดนี้ สำรองข้อมูลก่อนถอน
 - เพื่อรักษาการเข้าถึง VPS ระบบจะเก็บ OpenSSH, แพ็กเกจ apt, Linux user ที่ไม่บันทึกเจ้าของ, กฎ firewall ที่ไม่มีป้าย SSH-one และไฟล์ที่ถูกแก้หลังติดตั้งไว้ การถอนจึงไม่สามารถลบรายการเหล่านี้โดยเดาได้อย่างปลอดภัย
+
+## API สำหรับระบบขาย
+
+v26 มี API สำหรับดูข้อมูลระบบ/พอร์ต และสร้าง ดู แก้วันหมดอายุ หรือลบบัญชี SSH, UDP Custom, VMess, VLESS, Trojan และ Trojan-Go ใช้เมนูหลักข้อ **27** เพื่อสร้าง/ดู/ลบ token ค่าเริ่มต้นหมดอายุใน 30 วัน รหัสผ่านของบัญชี SSH/UDP ที่สร้างผ่าน API เก็บในไฟล์ root-only เพื่อให้ API ส่งคืนได้
+
+API ไม่เปิดรับการเชื่อมต่อจากอินเทอร์เน็ตโดยตรง ให้ backend เชื่อม SSH ด้วย IP และ SSH password หรือ key แล้วทำ tunnel มาที่ `127.0.0.1:8765` พร้อมส่ง API token ดู endpoint, JSON schema, ตัวอย่าง curl/Python และข้อจำกัดใน [คู่มือ API ภาษาไทย](API_GUIDE_TH.md) หรือ [English API guide](API_GUIDE_EN.md)
+
+API v1 ยังไม่ครอบคลุม L2TP, PPTP, SSTP, WireGuard, Shadowsocks, ShadowsocksR, firewall, DNS และคำสั่งบำรุงรักษาระบบ; รายการเหล่านี้จัดการผ่านเมนู/SSH ตามเดิม
 
 ### ถ้า v13 หยุดที่ `/etc/set.sh`
 

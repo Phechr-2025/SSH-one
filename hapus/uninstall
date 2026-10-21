@@ -32,6 +32,7 @@ units=(
   'udp-custom.service|/root/udp/udp-custom'
   'ssh-one-udp-expiry.service|ExecStart=/usr/bin/ssh-one-udp-expiry'
   'ssh-one-udp-expiry.timer|Unit=ssh-one-udp-expiry.service'
+  'ssh-one-api.service|ExecStart=/usr/bin/ssh-one-api serve'
   'udpgw.service|/bin/udpgw'
   'ws-tls.service|/usr/local/bin/ws-tls'
   'ws-nontls.service|/usr/local/bin/ws-nontls'
@@ -199,6 +200,7 @@ fi
 for path in /etc/xray /etc/trojan-go /etc/wireguard /root/udp /var/lib/crot; do
   if [[ -d $path ]]; then rm -rf -- "$path"; note "removed SSH-one data directory $path."; fi
 done
+rm -f -- /etc/ssh-one/api-tokens.json /etc/ssh-one/api-secrets.json
 if [[ -f /home/ver ]]; then
   version_value=$(tr -d '\r\n' < /home/ver)
   if [[ $version_value == 1.2 ]]; then rm -f -- /home/ver

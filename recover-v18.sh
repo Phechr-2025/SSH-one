@@ -63,6 +63,7 @@ release_version=$(tr -d '\r\n' < "$repo_root/VERSION")
 note "repairing the managed command inventory from $release_version; installed VPN services and user data will not be reinstalled."
 bash "$repo_root/update/install-managed-files.sh" || fail 'managed command setup failed; the incomplete marker was kept so recovery can be retried.'
 [[ -x /usr/bin/menu ]] && /usr/bin/menu --check >/dev/null || fail 'the installed menu did not pass its startup check.'
+[[ -x /usr/bin/ssh-one-api ]] && /usr/bin/ssh-one-api --install-service || fail 'the SSH-one API service could not be enabled.'
 
 if ! command -v sshd >/dev/null 2>&1 || ! command -v ss >/dev/null 2>&1; then
   fail 'SSH verification tools are missing; the VPS will not be rebooted.'

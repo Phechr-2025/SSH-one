@@ -58,3 +58,4 @@ clear
                echo " "
                echo "--------------------------------------"
                echo "Script are successfully run"
+               command -v ssh-one-api >/dev/null 2>&1 && ssh-one-api prune-secrets >/dev/null 2>&1 || true

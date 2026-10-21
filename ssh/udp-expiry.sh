@@ -38,3 +38,4 @@ if ! chmod 0600 "$state_tmp" || ! mv -fT -- "$state_tmp" "$state_file"; then
   printf 'SSH-one UDP expiry: could not save the expiry state file.\n' >&2
   exit 1
 fi
+command -v ssh-one-api >/dev/null 2>&1 && ssh-one-api prune-secrets >/dev/null 2>&1 || true

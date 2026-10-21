@@ -785,10 +785,7 @@ restart_udp() {
   pause
 }
 
-first_menu_iteration=1
-while true; do
-  if (( first_menu_iteration )) && [[ -t 1 ]] && command -v clear >/dev/null 2>&1; then clear 2>/dev/null || true; fi
-  first_menu_iteration=0
+if [[ -t 1 ]] && command -v clear >/dev/null 2>&1; then clear 2>/dev/null || true; fi
   printf '%s\n' '================ SSH-one UDP & Port Menu ================'
   printf '%s\n' '1. Open firewall ports'
   printf '%s\n' '2. Change UDP listener port'
@@ -814,7 +811,6 @@ while true; do
     8) list_online_udp_users ;;
     9) delete_udp_user || true ;;
     10) restart_udp || true ;;
-    0) exit 0 ;;
+    0) exit 99 ;;
     *) fail 'Invalid option.'; pause ;;
   esac
-done
