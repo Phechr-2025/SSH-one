@@ -38,12 +38,21 @@ pause() {
 }
 
 show_status() {
-  local service state listen='unknown'
+  local service state listen='unknown' members='' account_count=0
   printf '\nUDP Custom service status\n'
   for service in udp-custom.service udpgw.service; do
     if systemctl is-active --quiet "$service"; then state='active'; else state='inactive'; fi
     printf '  %-20s %s\n' "$service" "$state"
   done
+  if getent group "$udp_group" >/dev/null 2>&1; then
+    members=$(getent group "$udp_group" | awk -F: 'NR == 1 { print $4 }')
+    if [[ -n $members ]]; then
+      local -a udp_accounts=()
+      IFS=',' read -r -a udp_accounts <<< "$members"
+      account_count=${#udp_accounts[@]}
+    fi
+  fi
+  printf '  SSH UDP Custom accounts: %s (managed by this menu)\n' "$account_count"
   if [[ -r /root/udp/config.json ]]; then
     listen=$(sed -n 's/.*"listen"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /root/udp/config.json | head -n 1)
     [[ -n $listen ]] || listen='unknown'
@@ -289,22 +298,23 @@ PY
 create_udp_user() {
   local username password confirmation server_port
   [[ -x /root/udp/udp-custom ]] || { fail 'UDP Custom is not installed. Choose Install/repair UDP Custom first.'; pause; return 1; }
-  printf 'Username (4-32 letters/numbers/._-): '
+  printf 'Username (letters/numbers/._-; Linux limit is 32 characters): '
   read -r username || return 0
-  [[ $username =~ ^[A-Za-z0-9][A-Za-z0-9._-]{3,31}$ ]] || { fail 'Username must be 4-32 characters and start with a letter or number.'; pause; return 1; }
+  [[ $username =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$ ]] || { fail 'Username must be 1-32 characters, start with a letter or number, and contain only letters, numbers, dot, underscore, or hyphen.'; pause; return 1; }
+  [[ ! $username =~ ^[0-9]+$ ]] || { fail 'Username cannot contain only numbers.'; pause; return 1; }
   if getent passwd "$username" >/dev/null; then
     fail 'That username already exists. Choose another name.'
     pause
     return 1
   fi
-  printf 'Password (8-128 characters; colon is not allowed): '
+  printf 'Password (any non-empty length; colon is not allowed): '
   IFS= read -r -s password || return 0
   printf '\nConfirm password: '
   IFS= read -r -s confirmation || return 0
   printf '\n'
-  if (( ${#password} < 8 || ${#password} > 128 )) || [[ $password == *:* ]] || [[ $password != "$confirmation" ]]; then
+  if [[ -z $password || $password == *:* || $password != "$confirmation" ]]; then
     unset password confirmation
-    fail 'Passwords must match, contain 8-128 characters, and not contain a colon.'
+    fail 'Passwords must match, must not be empty, and must not contain a colon.'
     pause
     return 1
   fi

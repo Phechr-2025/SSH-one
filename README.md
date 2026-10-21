@@ -25,7 +25,7 @@
 
 > **ใช้กับ VPS ใหม่เท่านั้น** ไม่รองรับอัปเกรดหรือติดตั้งต่อจากงานที่ค้าง
 
-1. แตก ZIP แล้วอัปโหลด **ไฟล์และโฟลเดอร์ข้างใน** ไว้ที่รากของ repository อย่าวางในโฟลเดอร์ <code>SSH-one-v19</code>
+1. แตก ZIP แล้วอัปโหลด **ไฟล์และโฟลเดอร์ข้างใน** ไว้ที่รากของ repository อย่าวางในโฟลเดอร์ <code>SSH-one-v20</code>
 2. ใช้ repository ชื่อ <code>Phechr-2025/SSH-one</code> และ branch <code>main</code> หรือแก้ชื่อในคำสั่งติดตั้งให้ตรง repository ของคุณ
 3. เข้า VPS ด้วยบัญชี <code>root</code> แล้วรัน:
 
@@ -43,13 +43,13 @@
 
 ## อัปเดตและถอนการติดตั้ง
 
-ถ้าเครื่องเดิมยังเป็น v17 ให้เริ่มอัปเดตด้วยตัว bootstrap v19 นี้ (ถ้าเปลี่ยน repository ให้เปลี่ยน URL ให้ตรงด้วย):
+ถ้าเครื่องเดิมยังเป็น v17 ให้เริ่มอัปเดตด้วยตัว bootstrap v20 นี้ (ถ้าเปลี่ยน repository ให้เปลี่ยน URL ให้ตรงด้วย):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/update/updatemenu.sh)
 ```
 
-ถ้า v18 หยุดด้วยข้อความ <code>a pre-existing command has no safe backup: /usr/bin/about</code> ให้แก้โค้ด v19 ขึ้น repository ก่อน แล้วรันคำสั่งกู้คืนนี้บน VPS เดิม คำสั่งนี้ลงทะเบียนคำสั่ง/เมนูที่ขาดต่อจากจุดติดตั้งเดิม โดยไม่ติดตั้งบริการซ้ำ:
+ถ้า v18 หยุดด้วยข้อความ <code>a pre-existing command has no safe backup: /usr/bin/about</code> ให้แก้โค้ด v20 ขึ้น repository ก่อน แล้วรันคำสั่งกู้คืนนี้บน VPS เดิม คำสั่งนี้ลงทะเบียนคำสั่ง/เมนูที่ขาดต่อจากจุดติดตั้งเดิม โดยไม่ติดตั้งบริการซ้ำ:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/recover-v18.sh)
