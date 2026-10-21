@@ -4,7 +4,7 @@
 
 ## เตรียมก่อน
 
-- ใช้ VPS ใหม่ที่รองรับตาม [README](README.md)
+- ใช้ VPS ใหม่ที่รองรับตาม [README](../../README.md)
 - โดเมนต้องอยู่ใน Cloudflare, Zone ต้องเป็น Active และ nameserver ที่ตั้งกับผู้รับจดทะเบียนต้องตรงกับ nameserver ของ Zone
 - สร้าง DNS-only A record ของ Host ให้ชี้มายัง Public IPv4 ของ VPS ก่อนติดตั้ง
 - เตรียม Cloudflare API Token จากบัญชีที่จัดการ Zone ของโดเมนนี้ โดยให้สิทธิ์ Zone Read และ DNS Write เฉพาะ Zone

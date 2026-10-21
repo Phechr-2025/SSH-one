@@ -1,165 +1,55 @@
 # SSH-one
 
-**ภาษา / Language:** [ไทย](README.md) | [English](README_EN.md)
+**Languages:** [English](README.md) | [ไทย](README_TH.md)
 
 <div align="center">
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
-  <br><br>
-  <img src="https://img.shields.io/badge/SSH%20%2B%20VPN-Services-7257ff?style=for-the-badge&logo=linux&logoColor=white" alt="SSH and VPN services">
-  <img src="https://img.shields.io/badge/Cloudflare-DNS%20Automation-1684fc?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Cloudflare DNS automation">
-  <img src="https://img.shields.io/badge/Ubuntu-20.04%20x86__64-E95420?style=for-the-badge&logo=ubuntu&logoColor=white" alt="Ubuntu 20.04 x86 64">
-  <img src="https://img.shields.io/badge/UDP%20Custom-1%E2%80%9365535-00a884?style=for-the-badge" alt="UDP Custom ports 1 to 65535">
-
 </div>
 
----
+SSH-one installs and manages SSH/VPN services on a VPS. This document describes v26.
 
-## สารบัญ
+## Install
 
-- [ติดตั้งแบบรวดเร็ว](#ติดตั้งแบบรวดเร็ว)
-- [สิ่งที่ต้องเตรียม](#สิ่งที่ต้องเตรียม)
-- [ค่าที่ตัวติดตั้งถาม](#ค่าที่ตัวติดตั้งถาม)
-- [ระบบและบริการที่รองรับ](#ระบบและบริการที่รองรับ)
-- [อัปเดตและถอนการติดตั้ง](#อัปเดตและถอนการติดตั้ง)
-- [API สำหรับระบบขาย](#api-สำหรับระบบขาย)
-- [ข้อจำกัดที่ควรรู้](#ข้อจำกัดที่ควรรู้)
+Use a new Ubuntu 20.04 x86_64 VPS with systemd, a public IPv4 address, and working root SSH access. Debian, ARM, and other Ubuntu releases are not certified.
 
-## ติดตั้งแบบรวดเร็ว
+Before installing, create a DNS-only A record in Cloudflare (for example, <code>ssh1.example.com</code>) that points to the VPS public IPv4. Prepare a Cloudflare API token from the account that owns this zone, with Zone Read and DNS Write permissions limited to that zone.
 
-> **ใช้กับ VPS ใหม่เท่านั้น** ไม่รองรับอัปเกรดหรือติดตั้งต่อจากงานที่ค้าง
+Download and run the installer on the VPS:
 
-1. แตก ZIP แล้วอัปโหลด **ไฟล์และโฟลเดอร์ข้างใน** ไว้ที่รากของ repository อย่าวางในโฟลเดอร์ <code>SSH-one-v26</code>
-2. ใช้ repository ชื่อ <code>Phechr-2025/SSH-one</code> และ branch <code>main</code> หรือแก้ชื่อในคำสั่งติดตั้งให้ตรง repository ของคุณ
-3. เข้า VPS ด้วยบัญชี <code>root</code> แล้วรัน:
+~~~~bash
+curl -fsSL -o ssh-one-install.sh https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/install.sh
+bash ssh-one-install.sh Phechr-2025 SSH-one main
+~~~~
 
-    ```bash
-    bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/install.sh) Phechr-2025 SSH-one main
-    ```
+Enter the hostname and Cloudflare token when prompted. The installer checks DNS, zone access, and the record. After its SSH check succeeds, it counts down for 10 seconds and reboots. A daily reboot is scheduled for 05:00 in the VPS local timezone. If installation fails, inspect <code>/root/log-install.txt</code>; do not rerun the installer over a partial installation.
 
-4. กรอก Host/subdomain ที่มี DNS A record ชี้มายัง Public IPv4 ของ VPS แล้วกรอก Cloudflare API Token เมื่อระบบถาม
+## Installer inputs
 
-เมื่อตรวจ SSH ผ่าน จะนับถอยหลัง 10 วินาทีแล้ว reboot อัตโนมัติ หากไม่ผ่านจะหยุดและบันทึกสาเหตุที่ <code>/root/log-install.txt</code> ระบบยังตั้ง reboot ประจำวันเวลา 05:00 (GMT+8)
+- **Host/subdomain:** Full DNS name, such as <code>ssh1.example.com</code>. Do not enter an IP, port, or <code>https://</code>. Its DNS-only A record must already point to the VPS.
+- **Cloudflare API token:** Create it in the same Cloudflare account as the zone. Grant Zone Read and DNS Write only for that zone. Do not use a Global API Key.
 
-ค่าเริ่มต้นจะติดตั้ง UDP Custom อัตโนมัติ หลังเข้า VPS แล้วใช้คำสั่ง <code>menu</code> และเลือกข้อ 1 เพื่อเปิดพอร์ต เปลี่ยน listener ตั้งพอร์ต UDP ที่ต้องยกเว้น ตรวจสถานะ จัดการบัญชี หรือติดตั้ง/ซ่อม UDP Custom; ตัวติดตั้งจะเปิด UDP 1–65535 เป็นค่าเริ่มต้น และยกเว้นพอร์ตที่ระบุได้ ตัวติดตั้งตรวจว่าเมนูถูกลงเป็นคำสั่งที่เรียกใช้ได้ก่อนจบ; หากชื่อ <code>menu</code> ชนกับคำสั่งอื่น ให้ใช้ <code>/usr/bin/menu</code>
+The installer verifies public DNS, zone nameservers, token access, and the A record. DNS must have propagated and there must be no conflicting record. It stops and reports any mismatch.
 
-หากย้าย repository ให้แก้ <code>repository.conf</code> และ owner/repository/branch ในคำสั่งติดตั้ง
+Create the token in Cloudflare: My Profile → API Tokens → Create Token → Edit Zone DNS. Grant Zone Read and DNS Write, and restrict Zone Resources to this domain.
 
-## อัปเดตและถอนการติดตั้ง
+For a step-by-step Thai walkthrough, see the [Thai installation guide](docs/install/INSTALL_GUIDE_TH.md).
 
-ถ้าเครื่องเดิมยังเป็น v17 ให้เริ่มอัปเดตด้วย bootstrap รุ่น v26 นี้ (ถ้าเปลี่ยน repository ให้แก้ URL ให้ตรงด้วย):
+## Use and maintain
 
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/update/updatemenu.sh)
-```
+- Open the main menu with <code>menu</code>; if another command shadows it, use <code>/usr/bin/menu</code>.
+- Option **1** manages UDP Custom and the host firewall. UDP Custom is installed by default.
+- Option **21** updates SSH-one managed files. A successful update reports the version and file changes, counts down for 10 seconds, then reboots.
+- Open **22. Settings → 21** to control whether actions return to the main menu. The default is off.
+- Option **26** uninstalls SSH-one. Review the summary, back up data, and type <code>UNINSTALL</code> to confirm.
+- Option **27** creates, lists, and deletes API tokens. The default token lifetime is 30 days.
 
-ถ้า v18 หยุดด้วยข้อความ <code>a pre-existing command has no safe backup: /usr/bin/about</code> ให้อัปโหลดไฟล์ v26 ขึ้น repository ก่อน แล้วรันคำสั่งกู้คืนนี้บน VPS เดิม คำสั่งนี้ลงทะเบียนคำสั่ง/เมนูที่ขาดต่อจากจุดติดตั้งเดิม โดยไม่ติดตั้งบริการซ้ำ:
+Updates replace only files listed in the managed manifest. They do not automatically update OS packages, service configuration/accounts, or separately downloaded upstream binaries. Uninstall removes some service data; it retains OpenSSH, OS packages, unlabelled firewall rules, and files modified after installation.
 
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/recover-v18.sh)
-```
+## Services and default ports
 
-- อัปเดตจากเมนูหลักข้อ **21** หรือรัน <code>ssh-one-update</code> ด้วย root ตัวอัปเดตดาวน์โหลด ZIP จาก repository ที่บันทึกไว้ ตรวจ version และ syntax ของสคริปต์ แล้วเตรียมไฟล์ทั้งหมดก่อนสลับใช้งาน หากขั้นตอนแทนไฟล์หรือบันทึกทะเบียนไม่สำเร็จ จะย้อนคืนไฟล์ที่เปลี่ยนไป เมื่อสำเร็จจะแสดงรุ่นเดิมและรุ่นใหม่ จำนวนไฟล์ที่อัปเดต/ลบ แล้วนับถอยหลัง 10 วินาทีก่อน reboot
-- อัปเดตไฟล์คำสั่งและเมนูที่ระบุใน <code>update/managed-files.tsv</code> รวมถึงตัวอัปเดต/ถอนติดตั้ง บันทึก checksum ไว้ใช้ตรวจไฟล์ค้างและคืนไฟล์เดิมที่มีอยู่ก่อนติดตั้ง หากเครื่อง v17 ไม่มีคำสั่ง <code>menu</code> ให้ใช้ bootstrap ด้านบนก่อน แล้วลอง <code>/usr/bin/menu</code>
-- การอัปเดตนี้ไม่เปลี่ยนบัญชี/ไฟล์ตั้งค่าบริการ, firewall, แพ็กเกจระบบ หรือไบนารี VPN ที่ดาวน์โหลดจาก upstream แยกต่างหาก
-- เมนูแสดงรุ่นจาก marker ที่บันทึกหลังติดตั้ง/อัปเดต; หน้าหลักเพิ่มข้อมูลเครื่อง, bandwidth รายวัน/เมื่อวาน/เดือนนี้ และจำนวนบัญชี ส่วนข้อ **13** แสดงตารางพอร์ต
-- หัวเมนูแสดง short SHA ของ commit ที่ใช้ติดตั้ง/อัปเดตเมื่อ GitHub API ติดต่อได้; ตารางจำนวนบัญชีไม่มีสัญลักษณ์ ♦️ และเมนูไม่ถามให้กด Enter หลังทำรายการ
-- บัญชี SSH กับ UDP แยกกลุ่มและนับแยกกัน; รายการ SSH ไม่รวมบัญชี UDP
-- สร้างบัญชี UDP โดยใส่ชื่อ รหัสผ่าน และจำนวนวัน ระบบบันทึกเวลาหมดอายุจากเวลาสร้างและลบอัตโนมัติ โดยตรวจทุก 15 วินาที
-- UDP Custom รุ่นที่รวมมาไม่รายงานชื่อผู้ใช้ที่กำลังเชื่อมต่อ จึงแสดงสถานะบริการแทนรายชื่อผู้ใช้ออนไลน์
-- เมนูหลักหลังทำรายการทุกชนิดปิดเป็นค่าเริ่มต้น; เปลี่ยนได้ที่ **22. Settings → 21. Return to main menu after every action** การดูรายชื่อบัญชี สถานะบริการ และเมนูย่อยใช้ค่านี้ด้วย
-- API v1 ฟังเฉพาะ `127.0.0.1:8765`; เชื่อมผ่าน SSH tunnel แล้วแนบ API token ทุก request คู่มือทั้งสองภาษา: [ภาษาไทย](API_GUIDE_TH.md) · [English](API_GUIDE_EN.md)
-- การติดตั้งใหม่ไม่สร้างบัญชี `vps` หรือบัญชีบริการเริ่มต้นใน Xray, Trojan-Go, Shadowsocks, SSR, IPsec/PPTP; บัญชีระบบที่ OS ต้องใช้ เช่น `root` และ `www-data` ยังคงอยู่
-- บัญชี UDP ที่สร้างก่อน v25 ไม่มีเวลาหมดอายุที่บันทึกไว้ จะแสดง `not tracked`; ลบแล้วสร้างใหม่เพื่อกำหนดวันหมดอายุ
-- ถอนจากเมนูหลักข้อ **26** หรือรัน <code>ssh-one-uninstall</code> ด้วย root แล้วพิมพ์ <code>UNINSTALL</code> สคริปต์จะหยุดเฉพาะ service unit ที่ตรวจพบว่าเรียกไฟล์ของ SSH-one และลบไฟล์ที่ checksum ยังตรงกับไฟล์ที่ติดตั้งไว้ หากมีไฟล์เดิมอยู่ก่อนจะคืนไฟล์นั้น
-- การถอนลบข้อมูล/บัญชีใน <code>/etc/xray</code>, <code>/etc/trojan-go</code>, <code>/etc/wireguard</code>, <code>/root/udp</code> และ <code>/var/lib/crot</code> ซึ่งเป็นโฟลเดอร์ข้อมูลของบริการชุดนี้ สำรองข้อมูลก่อนถอน
-- เพื่อรักษาการเข้าถึง VPS ระบบจะเก็บ OpenSSH, แพ็กเกจ apt, Linux user ที่ไม่บันทึกเจ้าของ, กฎ firewall ที่ไม่มีป้าย SSH-one และไฟล์ที่ถูกแก้หลังติดตั้งไว้ การถอนจึงไม่สามารถลบรายการเหล่านี้โดยเดาได้อย่างปลอดภัย
+Open required ports in both the VPS firewall and the provider firewall/security group. These are configured defaults when the service is installed and running; check the VPS configuration and service status before use.
 
-## API สำหรับระบบขาย
-
-v26 มี API สำหรับดูข้อมูลระบบ/พอร์ต และสร้าง ดู แก้วันหมดอายุ หรือลบบัญชี SSH, UDP Custom, VMess, VLESS, Trojan และ Trojan-Go ใช้เมนูหลักข้อ **27** เพื่อสร้าง/ดู/ลบ token ค่าเริ่มต้นหมดอายุใน 30 วัน รหัสผ่านของบัญชี SSH/UDP ที่สร้างผ่าน API เก็บในไฟล์ root-only เพื่อให้ API ส่งคืนได้
-
-API ไม่เปิดรับการเชื่อมต่อจากอินเทอร์เน็ตโดยตรง ให้ backend เชื่อม SSH ด้วย IP และ SSH password หรือ key แล้วทำ tunnel มาที่ `127.0.0.1:8765` พร้อมส่ง API token ดู endpoint, JSON schema, ตัวอย่าง curl/Python และข้อจำกัดใน [คู่มือ API ภาษาไทย](API_GUIDE_TH.md) หรือ [English API guide](API_GUIDE_EN.md)
-
-API v1 ยังไม่ครอบคลุม L2TP, PPTP, SSTP, WireGuard, Shadowsocks, ShadowsocksR, firewall, DNS และคำสั่งบำรุงรักษาระบบ; รายการเหล่านี้จัดการผ่านเมนู/SSH ตามเดิม
-
-### ถ้า v13 หยุดที่ `/etc/set.sh`
-
-อย่ารันตัวติดตั้งซ้ำบน VPS เดิม เพราะบริการส่วนใหญ่ติดตั้งไปแล้ว ใช้คำสั่งนี้ใน shell ที่ยังเปิดอยู่:
-
-```bash
-curl -fsSL -o /root/ssh-one-recover-v13.sh https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/recover-v13.sh && bash /root/ssh-one-recover-v13.sh
-```
-
-สคริปต์จะปิด unit `autosett` ที่เสีย ตรวจ SSH และพอร์ต 22/2253 ก่อน หากผ่านจะนับ 10 วินาทีแล้ว reboot; หากไม่ผ่านจะหยุดและบันทึกสาเหตุใน <code>/root/log-install.txt</code>
-
-## สิ่งที่ต้องเตรียม
-
-- VPS ใหม่ที่ใช้ **Ubuntu 20.04 x86_64**, มี <code>systemd</code> และเข้าใช้งานด้วย <code>root</code>
-- IPv4 สาธารณะ และพอร์ตที่ต้องใช้เปิดผ่าน firewall/security group ของผู้ให้บริการ VPS
-- โดเมนใน Cloudflare ที่มี Zone สถานะ **Active**, ใช้ nameserver ของ Zone นั้นจริง และมี DNS-only A record ของ Host ชี้มายัง Public IPv4 ของ VPS
-- Cloudflare API Token จากบัญชีเดียวกับ Zone ที่มีสิทธิ์ **Zone:Read** และ **DNS:Write** เฉพาะ Zone ที่ใช้งาน
-- เชื่อมต่อ VPS ผ่าน SSH ได้ก่อนเริ่มติดตั้ง
-
-> ต้องมีรหัส root ที่ใช้ได้หรือ SSH key และเปิด TCP 22/2253 ใน firewall ของผู้ให้บริการ หาก root ถูกล็อก ให้ตั้งค่าผ่าน console ก่อนใช้
-
-> รองรับเฉพาะ Ubuntu 20.04 x86_64; Debian, ARM และ Ubuntu รุ่นอื่นยังไม่รับรอง
-
-## ค่าที่ตัวติดตั้งถาม
-
-ตัวติดตั้งถาม Host ก่อน ตรวจ DNS กับ IP สาธารณะของ VPS แล้วจึงขอ Cloudflare API Token และเริ่มติดตั้งบริการ
-
-### 1. Host/subdomain
-
-ชื่อ DNS ที่จะใช้เชื่อมต่อ เช่น <code>ssh1.mydomain.com</code>
-
-- ใช้ชื่อเต็มในโดเมน Cloudflare เช่น <code>ssh1.mydomain.com</code>; ไม่ต้องใส่ <code>https://</code>, พอร์ต หรือ IP
-- สร้าง DNS-only A record ให้ Host ชี้มายัง Public IPv4 ของ VPS ก่อนติดตั้ง
-
-หลังกรอก Host ตัวติดตั้งตรวจ public DNS ว่า A record ชี้มายัง VPS จริง หากไม่ตรงจะแสดง IP ที่คาดหวังกับค่าที่พบ แล้วให้แก้ DNS และกดตรวจซ้ำ หรือเปลี่ยน Host ก่อนติดตั้งต่อ หาก VPS ติดต่อ public DNS ไม่ได้จะแจ้งให้ตรวจ outbound HTTPS ก่อนลองใหม่ เมื่อผ่านแล้ว Cloudflare API จะยืนยันและคง A record แบบ DNS only ไว้ที่ IP เดียวกัน หากเปิด Cloudflare Proxy หรือมี CNAME/record ชนกัน การตรวจหรือตั้งค่าอาจไม่ผ่าน
-
-### 2. Cloudflare API Token
-
-Token ใช้จัดการ DNS ผ่าน Cloudflare API ไม่ใช่รหัสผ่านบัญชีหรือ Global API Key ต้องสร้าง/ใช้ Token จากบัญชี Cloudflare ที่จัดการ Zone ของโดเมน Host นี้ หากมีหลายบัญชี ให้เลือกบัญชีที่มี DNS zone และ record ของโดเมนจริง
-
-วิธีสร้าง:
-
-1. ไปที่ **My Profile → API Tokens → Create Token**
-2. เลือก template **Edit Zone DNS** เพื่อให้สิทธิ์ **DNS Write** แล้วเพิ่ม **Zone Read** หากยังไม่มี
-3. จำกัด Zone Resources ให้เฉพาะโดเมนที่จะใช้ แล้วสร้างและคัดลอก Token
-
-วาง Token ในช่องติดตั้ง (ตัวอักษรถูกซ่อนขณะพิมพ์) อย่าเผยแพร่ Token ตัวติดตั้งจะแสดงชื่อและ ID ของบัญชีที่ API ใช้เข้าถึง Zone ตรวจว่า nameserver สาธารณะตรงกับ Zone ในบัญชีนั้น และยืนยันว่า A record แบบ DNS only ชี้ไปยัง Public IPv4 ของ VPS หาก Token เข้าถึง Zone ผิดหรือไม่มีสิทธิ์ ระบบจะแจ้งให้ตรวจบัญชีและสิทธิ์ก่อนติดตั้งบริการ
-
-- [คู่มือเพิ่มโดเมนและตั้ง nameserver ใน Cloudflare](https://developers.cloudflare.com/fundamentals/manage-domains/add-site/)
-- [คู่มือสร้าง API Token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)
-- [สิทธิ์และ template ของ API Token](https://developers.cloudflare.com/fundamentals/api/reference/template/)
-
-### ตัวอย่าง
-
-ตัวอย่างเมื่อโดเมน <code>mydomain.com</code> อยู่ใน Cloudflare:
-
-```text
-Host/subdomain: ssh1.mydomain.com
-Cloudflare API Token: [วาง Token ที่สร้าง]
-```
-
-ไม่ต้องกรอก Zone หรือ IP แต่ต้องตั้ง DNS-only A record ให้ชี้มายัง VPS ก่อน ตัวติดตั้งตรวจ DNS สาธารณะก่อนขอ Token แล้วใช้ Token ตรวจและยืนยัน record ผ่าน Cloudflare API
-
-## ระบบและบริการที่รองรับ
-
-### ระบบปฏิบัติการ
-
-| รายการ | สถานะ |
-| --- | --- |
-| Ubuntu 20.04 x86_64 + systemd | รองรับ |
-| Debian, Ubuntu รุ่นอื่น, ARM | ยังไม่รับรอง |
-
-Ubuntu 20.04 สิ้นสุด Standard Security Maintenance แล้ว หากนำไปใช้งานต่อควรเปิด Ubuntu Pro/ESM หรือใช้ระบบปฏิบัติการที่ยังได้รับอัปเดตความปลอดภัย ([รายละเอียด lifecycle](https://ubuntu.com/20-04))
-
-### บริการและพอร์ตเริ่มต้น
-
-พอร์ตเริ่มต้นอาจเปลี่ยนได้ ตรวจ <code>/root/log-install.txt</code> และสถานะ service ก่อนใช้งาน
-
-| บริการ | พอร์ต/โปรโตคอล |
+| Service | Port/protocol |
 | --- | --- |
 | OpenSSH | TCP 22, 2253 |
 | Dropbear | TCP 109, 143, 1153 |
@@ -174,27 +64,23 @@ Ubuntu 20.04 สิ้นสุด Standard Security Maintenance แล้ว �
 | Shadowsocks OBFS | TCP/TLS 2443–2543, TCP/HTTP 3443–3543 |
 | Xray VMess | TCP/TLS 8443, TCP 80 |
 | Xray VLESS | TCP/TLS 8444, TCP 81 |
-| Xray Trojan, TrojanGo | TCP 2083, 2087 |
+| Xray Trojan, Trojan-Go | TCP 2083, 2087 |
 | OHP | TCP 8181, 8282, 8383 |
-| UDP Custom | UDP 1–65535 ตามรูปแบบต้นฉบับ; ยกเว้นพอร์ตบริการ UDP อื่น 500, 1701, 2200, 4500, 7070 ไว้เป็นค่าเริ่มต้น; listener `:36712` |
+| UDP Custom | UDP 1–65535; listener defaults to 36712 |
 
-ตารางเป็นค่าพอร์ตที่ตั้งไว้ในสคริปต์; `443/TCP` เป็น listener ของ SSLH ที่ส่งต่อการเชื่อมต่อ TLS ไปยังบริการที่เกี่ยวข้อง ส่วน Stunnel ใช้ `445`, `777` และ `990` ตาม config จริง
+UDP Custom uses UDP ports 1–65535. The installer opens this range in UFW when UFW is active; allow the ports separately in the VPS provider firewall/security group. Ports 500, 1701, 2200, 4500, and 7070 are excluded by default for other UDP services. The listener defaults to <code>:36712</code> and can be changed from option 1. This binary cannot report connected UDP usernames.
 
-ค่าเริ่มต้นตัวติดตั้งเปิดช่วง UDP <code>1–65535</code> ใน UFW เมื่อ UFW ทำงาน และปรับช่วงได้จาก <code>menu → 1 → Open port(s)</code> โดยเลือก UDP, TCP หรือทั้งคู่ หากเว้นช่อง Protocol และ Ports ระบบใช้ UDP กับช่วง <code>1–65535</code> เป็นค่าเริ่มต้น
+## API for automation
 
-UDP Custom ใช้รูปแบบต้นฉบับที่รองรับ UDP ช่วง <code>1–65535</code>; ยกเว้น UDP <code>500, 1701, 2200, 4500, 7070</code> ไว้ให้ IPsec/L2TP, OpenVPN UDP และ WireGuard ของชุดติดตั้ง ส่วนค่า config listener เริ่มต้นคือ <code>:36712</code> แก้รายการยกเว้นได้ที่ <code>menu → 1 → 3</code> ซึ่งรีสตาร์ตบริการให้ด้วย เปิด UDP ใน firewall/VPS provider ให้ตรงกับบริการที่ใช้
+API v1 reads VPS/system/port information and creates, lists, reads, renews, or deletes SSH, UDP Custom, VMess, VLESS, Trojan, and Trojan-Go accounts. Connect through an SSH tunnel to <code>127.0.0.1:8765</code> and send a bearer token with every request. Do not expose the API port publicly or put secrets in a browser.
 
-ค่า buffer <code>32 MB / 80 MB</code> คงตาม config ต้นฉบับ ไม่เพิ่มค่าสูงแบบเหมารวม เพราะไม่ได้ทำให้ ping ลดลงโดยอัตโนมัติและอาจเพิ่มการใช้ RAM/การหน่วงเมื่อเครือข่ายคับคั่ง หาก binary นำค่านี้ไปตั้ง socket buffer, Linux ยังอาจ clamp ตาม <code>rmem_max</code>/<code>wmem_max</code>; รอบนี้ไม่เปลี่ยน sysctl ระดับเครื่องโดยไม่มีการวัดและตรวจผลจริง
+- [API guide — English](docs/api/API_GUIDE_EN.md)
+- [คู่มือ API ภาษาไทย](docs/api/API_GUIDE_TH.md)
 
-ค่า ping และความเร็วจริงขึ้นกับระยะทาง/เส้นทางเครือข่าย, packet loss, การจำกัด UDP ของผู้ให้บริการ, CPU และ MTU ของ VPS กับไคลเอนต์ สคริปต์ไม่สามารถรับประกัน ping ต่ำสุดหรือความเร็วสูงสุดได้
+There are no API endpoints for L2TP/PPTP/SSTP, WireGuard, Shadowsocks/SSR, firewall, DNS, update, reboot, uninstall, or general shell commands.
 
-## ข้อจำกัดที่ควรรู้
+## Limitations and help
 
-- **SlowDNS** ไม่ติดตั้ง: upstream อ้างไฟล์ที่ไม่มีและมีคำสั่งลบไฟล์ใน <code>/root</code>
-- **gRPC** ปิดไว้ตาม upstream
-- **Squid** ไม่ติดตั้งในชุดต้นฉบับ
-- **OHP** ต้องมี HTTP proxy ที่ <code>127.0.0.1:3128</code>
-- บริการเดิมบางตัวขึ้นกับ upstream จึงอาจใช้ไม่ได้ในบาง VPS
-- สำรองข้อมูลก่อนติดตั้ง หากล้มเหลวให้ตรวจ <code>/root/log-install.txt</code>; ไม่รองรับติดตั้งต่ออย่างปลอดภัย
-- หาก Token/credential เคยอยู่ใน Git history ให้ revoke แล้วสร้างใหม่
-- Backup/restore ต้องตั้ง remote ชื่อ <code>dr</code> ด้วย <code>rclone config</code>
+SlowDNS is not installed, gRPC is disabled, and Squid is not included. OHP requires an HTTP proxy at <code>127.0.0.1:3128</code>. Upstream services can behave differently across VPS providers and networks; ping or throughput cannot be guaranteed.
+
+For errors, inspect the relevant service status and <code>/root/log-install.txt</code>. Back up before installing, updating, or uninstalling. Revoke and replace any Cloudflare/API token that was exposed in Git history.
