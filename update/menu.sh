@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
 # Keep optional statistics tools from delaying or hiding the menu.
-MENU_VERSION='v19'
+MENU_VERSION='v23'
+if [[ -r /etc/ssh-one/installation-complete ]]; then
+  installed_menu_version=''
+  IFS= read -r installed_menu_version < /etc/ssh-one/installation-complete || true
+  [[ $installed_menu_version =~ ^v[0-9]+$ ]] && MENU_VERSION=$installed_menu_version
+fi
 
 if [[ ${1:-} == --check ]]; then
   printf 'SSH-one menu %s is ready.\n' "$MENU_VERSION"
@@ -33,27 +38,133 @@ count_matches() {
   fi
 }
 
+cpu_usage() {
+  local label user1 nice1 system1 idle1 iowait1 irq1 softirq1 steal1
+  local user2 nice2 system2 idle2 iowait2 irq2 softirq2 steal2
+  [[ -r /proc/stat ]] || { printf 'N/A'; return; }
+  read -r label user1 nice1 system1 idle1 iowait1 irq1 softirq1 steal1 _ < /proc/stat || { printf 'N/A'; return; }
+  sleep 0.5
+  read -r label user2 nice2 system2 idle2 iowait2 irq2 softirq2 steal2 _ < /proc/stat || { printf 'N/A'; return; }
+  LC_ALL=C awk -v u1="$user1" -v n1="$nice1" -v s1="$system1" -v i1="$idle1" -v w1="$iowait1" -v q1="$irq1" -v r1="$softirq1" -v t1="$steal1" \
+      -v u2="$user2" -v n2="$nice2" -v s2="$system2" -v i2="$idle2" -v w2="$iowait2" -v q2="$irq2" -v r2="$softirq2" -v t2="$steal2" \
+      'BEGIN { total1=u1+n1+s1+i1+w1+q1+r1+t1; total2=u2+n2+s2+i2+w2+q2+r2+t2; delta=total2-total1; idle=(i2+w2)-(i1+w1); if (delta <= 0) print "N/A"; else printf "%.1f", 100*(delta-idle)/delta }' 2>/dev/null || printf 'N/A'
+}
+
+traffic_value() {
+  local json=$1 period=$2 year=$3 month=$4 day=${5:-0}
+  [[ -n $json ]] || { printf 'N/A'; return; }
+  jq -r --arg period "$period" --argjson year "$year" --argjson month "$month" --argjson day "$day" '
+    def human:
+      if . >= 1099511627776 then ((. / 1099511627776 * 100 | floor) / 100 | tostring) + " TiB"
+      elif . >= 1073741824 then ((. / 1073741824 * 100 | floor) / 100 | tostring) + " GiB"
+      elif . >= 1048576 then ((. / 1048576 * 100 | floor) / 100 | tostring) + " MiB"
+      elif . >= 1024 then ((. / 1024 * 100 | floor) / 100 | tostring) + " KiB"
+      else (tostring) + " B" end;
+    .interfaces[0].traffic as $traffic
+    | (if $period == "day" then
+         [($traffic.days // $traffic.day // [])[]? | select(.date.year == $year and .date.month == $month and .date.day == $day) | ((.rx // 0) + (.tx // 0))]
+       else
+         [($traffic.months // $traffic.month // [])[]? | select(.date.year == $year and .date.month == $month) | ((.rx // 0) + (.tx // 0))]
+       end) as $values
+    | if ($values | length) == 0 then "N/A" else ($values | add | human) end
+  ' 2>/dev/null || printf 'N/A'
+}
+
+bandwidth_summary() {
+  local interface='' data='' today yesterday today_y today_m today_d yesterday_y yesterday_m yesterday_d current_y current_m
+  local daily='N/A' yesterday_usage='N/A' monthly='N/A'
+  if command -v vnstat >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && command -v date >/dev/null 2>&1; then
+    interface=$(ip -4 route show default 2>/dev/null | awk 'NR == 1 { for (i=1; i<=NF; i++) if ($i == "dev") { print $(i+1); exit } }')
+    if [[ -n $interface ]]; then
+      data=$(vnstat --iface "$interface" --json s 2>/dev/null) || data=''
+    fi
+    [[ -n $data ]] || data=$(vnstat --json s 2>/dev/null) || data=''
+    read -r today_y today_m today_d < <(date +'%Y %m %d' 2>/dev/null) || true
+    read -r yesterday_y yesterday_m yesterday_d < <(date -d yesterday +'%Y %m %d' 2>/dev/null) || true
+    read -r current_y current_m < <(date +'%Y %m' 2>/dev/null) || true
+    if [[ $today_y =~ ^[0-9]+$ && $today_m =~ ^[0-9]+$ && $today_d =~ ^[0-9]+$ ]]; then
+      daily=$(traffic_value "$data" day "$((10#$today_y))" "$((10#$today_m))" "$((10#$today_d))")
+    fi
+    if [[ $yesterday_y =~ ^[0-9]+$ && $yesterday_m =~ ^[0-9]+$ && $yesterday_d =~ ^[0-9]+$ ]]; then
+      yesterday_usage=$(traffic_value "$data" day "$((10#$yesterday_y))" "$((10#$yesterday_m))" "$((10#$yesterday_d))")
+    fi
+    if [[ $current_y =~ ^[0-9]+$ && $current_m =~ ^[0-9]+$ ]]; then
+      monthly=$(traffic_value "$data" month "$((10#$current_y))" "$((10#$current_m))")
+    fi
+  fi
+  printf '%s♦️ Daily Usage     : %s%s\n' "$white" "$daily" "$reset"
+  printf '%s♦️ Yesterday Usage : %s%s\n' "$white" "$yesterday_usage" "$reset"
+  printf '%s♦️ Monthly Usage   : %s%s\n' "$white" "$monthly" "$reset"
+}
+
 server_summary() {
-  local os='Linux' uptime='N/A' cores='N/A' load='N/A' ram='N/A'
+  local os='Linux' uptime='N/A' cores='N/A' cpu='N/A' ram='N/A' domain='N/A' dnstt='N/A' public_ip='N/A'
+  local ssh_accounts udp_accounts
   if [[ -r /etc/os-release ]]; then
     os=$( . /etc/os-release; printf '%s' "${PRETTY_NAME:-Linux}" ) 2>/dev/null || os='Linux'
   fi
-  command -v uptime >/dev/null 2>&1 && uptime -p >/dev/null 2>&1 && uptime=$(uptime -p 2>/dev/null) || true
+  command -v uptime >/dev/null 2>&1 && uptime=$(uptime -p 2>/dev/null | sed 's/^up //') || true
   command -v getconf >/dev/null 2>&1 && cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null) || true
-  [[ -r /proc/loadavg ]] && load=$(awk '{print $1}' /proc/loadavg 2>/dev/null) || true
-  command -v free >/dev/null 2>&1 && ram=$(free -m 2>/dev/null | awk 'NR==2 {printf "%s/%s MB", $3, $2}') || true
-  printf '%s  OS: %s\n' "$cyan" "${os:-Linux}"
-  printf '  Kernel: %s | Uptime: %s\n' "$(uname -r 2>/dev/null || printf 'N/A')" "${uptime:-N/A}"
-  printf '  CPU cores: %s | Load: %s | RAM: %s\n' "${cores:-N/A}" "${load:-N/A}" "${ram:-N/A}"
-  printf '  Host: %s | DNS domain: %s\n' \
-    "$(read_value /etc/ssh-one/host)" "$(read_value /etc/xray/domain)"
-  printf '  Accounts: SSH %s | VMess %s | VLESS %s | Trojan %s | Trojan-Go %s\n' \
-    "$(awk -F: '$3 >= 1000 && $1 != "nobody" {n++} END {print n+0}' /etc/passwd 2>/dev/null)" \
+  cpu=$(cpu_usage)
+  command -v free >/dev/null 2>&1 && ram=$(free -m 2>/dev/null | awk 'NR==2 {printf "%s/%s", $3, $2}') || true
+  [[ -n $ram ]] || ram='N/A'
+  domain=$(read_value /etc/xray/domain)
+  [[ $domain != N/A ]] || domain=$(read_value /etc/ssh-one/host)
+  dnstt=$(read_value /root/nsdomain)
+  public_ip=$(read_value /etc/ssh-one/public-ip)
+  if [[ $public_ip == N/A && $domain != N/A ]] && command -v getent >/dev/null 2>&1; then
+    public_ip=$(timeout 2 getent ahostsv4 "$domain" 2>/dev/null | awk 'NR == 1 {print $1}')
+    [[ -n $public_ip ]] || public_ip='N/A'
+  fi
+  ssh_accounts=$(awk -F: '$3 >= 1000 && $1 != "nobody" && $7 !~ /(nologin|false)$/ {n++} END {print n+0}' /etc/passwd 2>/dev/null)
+  udp_accounts=$(getent group ssh-one-udp 2>/dev/null | awk -F: '$1 == "ssh-one-udp" {if ($4 == "") print 0; else {n=split($4, members, ","); print n}; found=1} END {if (!found) print 0}')
+  printf '%s\n' "${cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}"
+  printf '%s♦️ Server Information ♦️%s\n' "$white" "$reset"
+  printf '%s♦️ OS       : %s%s\n' "$white" "${os:-Linux}" "$reset"
+  printf '%s♦️ KERNEL   : %s%s\n' "$white" "$(uname -r 2>/dev/null || printf 'N/A')" "$reset"
+  printf '%s♦️ UPTIME   : %s%s\n' "$white" "${uptime:-N/A}" "$reset"
+  printf '%s♦️ CPU      : %s core (%s%%)%s\n' "$white" "${cores:-N/A}" "$cpu" "$reset"
+  printf '%s♦️ RAM      : %s MB / %s MB%s\n' "$white" "${ram%%/*}" "${ram#*/}" "$reset"
+  printf '%s♦️ DOMAIN   : %s%s\n' "$white" "$domain" "$reset"
+  printf '%s♦️ DNSTT    : %s%s\n' "$white" "$dnstt" "$reset"
+  printf '%s♦️ IPVPS    : %s%s\n' "$white" "$public_ip" "$reset"
+  printf '%s\n' "${cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}"
+  printf '%s♦️ Total Bandwidth ♦️%s\n' "$white" "$reset"
+  bandwidth_summary
+  printf '%s\n' "${cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}"
+  printf '%s♦️ Accounts ♦️%s\n' "$white" "$reset"
+  printf '♦️ %-6s %-7s %-8s %-7s %-8s %-9s\n' 'UDP' 'SSH' 'VMESS' 'VLESS' 'TROJAN' 'TROJANGO'
+  printf '♦️ %-6s %-7s %-8s %-7s %-8s %-9s\n' "$udp_accounts" "${ssh_accounts:-0}" \
     "$(count_matches '^### ' /etc/xray/config.json)" \
     "$(count_matches '^#### ' /etc/xray/config.json)" \
     "$(count_matches '^#&# ' /etc/xray/config.json)" \
     "$(count_matches '^### ' /etc/trojan-go/akun.conf)"
   printf '%s\n' "$reset"
+}
+
+show_service_ports() {
+  local line='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+  printf '%s\n' "$cyan$line$reset"
+  printf '%s♦️ Service Ports ♦️%s\n' "$white" "$reset"
+  printf '%s\n' "$cyan$line$reset"
+  printf '%-30s %s\n' 'Service' 'Port / Protocol'
+  printf '%-30s %s\n' 'OpenSSH' 'TCP 22, 2253'
+  printf '%-30s %s\n' 'Dropbear' 'TCP 109, 143, 1153'
+  printf '%-30s %s\n' 'OpenVPN' 'TCP 1194, UDP 2200, TLS/TCP 990'
+  printf '%-30s %s\n' 'SSLH / SSH WebSocket' 'TCP 443 (TLS multiplex), HTTP 8880'
+  printf '%-30s %s\n' 'Stunnel5' 'TCP 445, 777, 990'
+  printf '%-30s %s\n' 'BadVPN UDPGW' 'TCP 7100, 7200, 7300 (loopback)'
+  printf '%-30s %s\n' 'WireGuard' 'UDP 7070'
+  printf '%-30s %s\n' 'L2TP/IPsec, PPTP' 'UDP 500, 1701, 4500; TCP 1732'
+  printf '%-30s %s\n' 'SSTP' 'TCP 444'
+  printf '%-30s %s\n' 'Shadowsocks-R' 'TCP 1443-1543'
+  printf '%-30s %s\n' 'Shadowsocks OBFS' 'TCP/TLS 2443-2543, TCP/HTTP 3443-3543'
+  printf '%-30s %s\n' 'Xray VMess' 'TCP/TLS 8443, TCP 80'
+  printf '%-30s %s\n' 'Xray VLESS' 'TCP/TLS 8444, TCP 81'
+  printf '%-30s %s\n' 'Xray Trojan, TrojanGo' 'TCP 2083, 2087'
+  printf '%-30s %s\n' 'OHP' 'TCP 8181, 8282, 8383'
+  printf '%-30s %s\n' 'UDP Custom' 'UDP 1-65535 (listener :36712 by default)'
+  printf '%s\n' "$cyan$line$reset"
 }
 
 show_menu() {
@@ -126,7 +237,7 @@ while :; do
     10) run_action vlessmenu ;;
     11) run_action trmenu ;;
     12) run_action trgomenu ;;
-    13) run_action info ;;
+    13) show_service_ports ;;
     14) run_action ipsaya ;;
     15) run_action running ;;
     16) run_action htop ;;

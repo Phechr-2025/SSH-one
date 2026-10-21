@@ -120,7 +120,7 @@ for target in "${!targets[@]}"; do
   printf '%s\t%s\n' "$target" "$hash" >> "$stage_dir/managed-files.sha256"
 done
 : > "$stage_dir/runtime-files.sha256"
-for path in /usr/local/bin/xray /usr/local/bin/trojan-go /usr/local/bin/ws-tls /usr/local/bin/ws-nontls /usr/local/bin/ws-ovpn /usr/local/bin/ohpserver /bin/udpgw /root/udp/udp-custom; do
+for path in /usr/local/bin/xray /usr/local/bin/trojan-go /usr/local/bin/ws-tls /usr/local/bin/ws-nontls /usr/local/bin/ws-ovpn /usr/local/bin/ohpserver /root/udp/udp-custom; do
   if [[ -f $path && ! -L $path ]]; then
     hash=$(sha256sum -- "$path" | awk '{print $1}')
     printf '%s\t%s\n' "$path" "$hash" >> "$stage_dir/runtime-files.sha256"

@@ -32,18 +32,69 @@ fi
 
 raw_base="https://raw.githubusercontent.com/${repo_owner}/${repo_name}/${repo_branch}"
 udp_group='ssh-one-udp'
+default_udp_exclusions='500,1701,2200,4500,7070'
 pause() {
   local unused
   read -r -p 'Press Enter to continue...' unused || true
 }
 
-show_status() {
-  local service state listen='unknown' members='' account_count=0
-  printf '\nUDP Custom service status\n'
-  for service in udp-custom.service udpgw.service; do
-    if systemctl is-active --quiet "$service"; then state='active'; else state='inactive'; fi
-    printf '  %-20s %s\n' "$service" "$state"
+wait_for_udp_custom() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if systemctl is-active --quiet udp-custom.service; then
+      sleep 1
+      systemctl is-active --quiet udp-custom.service && return 0
+    else
+      sleep 1
+    fi
   done
+  return 1
+}
+
+current_udp_exclusions() {
+  local configured=''
+  if [[ -r /etc/ssh-one/udp-exclude-ports ]]; then
+    tr -d '\r\n' < /etc/ssh-one/udp-exclude-ports
+    return
+  fi
+  if [[ -r /etc/systemd/system/udp-custom.service ]]; then
+    configured=$(sed -n 's|^ExecStart=/root/udp/udp-custom server -exclude ||p' /etc/systemd/system/udp-custom.service | head -n 1)
+  fi
+  printf '%s' "${configured:-$default_udp_exclusions}"
+}
+
+ensure_python3() {
+  command -v python3 >/dev/null 2>&1 && return 0
+  command -v apt-get >/dev/null 2>&1 || return 1
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update && apt-get install -y --no-install-recommends python3
+}
+
+read_listener_port() {
+  python3 - /root/udp/config.json <<'PY'
+import json, re, sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as stream:
+        listen = json.load(stream).get('listen', '')
+    match = re.fullmatch(r'.*:([0-9]{1,5})', listen)
+    if not match or not 1 <= int(match.group(1)) <= 65535:
+        raise ValueError('unsupported listen address')
+    print(int(match.group(1)))
+except Exception as error:
+    print(f'Could not read the UDP Custom listener port: {error}', file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+show_status() {
+  local service state listen='unknown' members='' account_count=0 exclusions='none'
+  printf '\nUDP Custom service status\n'
+  service=udp-custom.service
+  if systemctl is-active --quiet "$service"; then state='active'; else state='inactive'; fi
+  printf '  %-20s %s\n' "$service" "$state"
+  exclusions=$(current_udp_exclusions)
+  [[ -n $exclusions ]] || exclusions='none'
+  printf '  UDP Custom excluded ports: %s\n' "$exclusions"
   if getent group "$udp_group" >/dev/null 2>&1; then
     members=$(getent group "$udp_group" | awk -F: 'NR == 1 { print $4 }')
     if [[ -n $members ]]; then
@@ -70,8 +121,8 @@ show_status() {
 }
 
 install_udp() {
-  local answer tmp
-  if [[ -x /root/udp/udp-custom && -f /etc/systemd/system/udp-custom.service && -f /etc/systemd/system/udpgw.service ]]; then
+  local answer tmp installer_url
+  if [[ -x /root/udp/udp-custom && -f /etc/systemd/system/udp-custom.service ]]; then
     printf 'UDP Custom is already installed. Reinstall/repair it now? Existing /root/udp/config.json will be preserved. [y/N] '
     read -r answer || return 0
     [[ ${answer,,} == y || ${answer,,} == yes ]] || return 0
@@ -81,12 +132,30 @@ install_udp() {
     [[ ${answer,,} == y || ${answer,,} == yes ]] || return 0
   fi
 
-  command -v curl >/dev/null 2>&1 || { fail 'curl is required. Install it with: apt-get install -y curl'; return 1; }
   tmp=$(mktemp -d /tmp/ssh-one-udp-menu.XXXXXX) || { fail 'Could not create a temporary directory.'; return 1; }
-  if ! curl --fail --location --retry 3 --silent --show-error \
-    "$raw_base/udp-custom/install.sh" -o "$tmp/install.sh"; then
+  installer_url="$raw_base/udp-custom/install.sh"
+  if command -v curl >/dev/null 2>&1; then
+    if ! curl --fail --location --retry 3 --silent --show-error "$installer_url" -o "$tmp/install.sh"; then
+      rm -rf -- "$tmp"
+      fail 'Could not download the UDP Custom installer. Check outbound HTTPS and repository settings.'
+      return 1
+    fi
+  elif command -v wget >/dev/null 2>&1; then
+    if ! wget --quiet --tries=3 --timeout=30 -O "$tmp/install.sh" "$installer_url"; then
+      rm -rf -- "$tmp"
+      fail 'Could not download the UDP Custom installer. Check outbound HTTPS and repository settings.'
+      return 1
+    fi
+  elif command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    if ! apt-get update || ! apt-get install -y --no-install-recommends ca-certificates curl || ! curl --fail --location --retry 3 --silent --show-error "$installer_url" -o "$tmp/install.sh"; then
+      rm -rf -- "$tmp"
+      fail 'Could not install a download tool or fetch the UDP Custom installer.'
+      return 1
+    fi
+  else
     rm -rf -- "$tmp"
-    fail 'Could not download the UDP Custom installer. Check outbound HTTPS and repository settings.'
+    fail 'curl or wget is required, and apt-get is unavailable to install it.'
     return 1
   fi
   if bash "$tmp/install.sh"; then
@@ -132,6 +201,39 @@ normalize_ports() {
       normalized_ports+=("$start")
     else
       normalized_ports+=("$start:$end")
+    fi
+  done
+}
+
+normalize_exclusions() {
+  local raw=$1 token port
+  local -a tokens
+  local -A seen=()
+  normalized_exclusions=()
+  raw=${raw//[[:space:]]/}
+  [[ -z $raw ]] && return 0
+  if [[ $raw == ,* || $raw == *, || $raw == *,,* ]]; then
+    fail 'Enter excluded UDP ports as a comma-separated list without empty items.'
+    return 1
+  fi
+  IFS=',' read -r -a tokens <<< "$raw"
+  if (( ${#tokens[@]} > 256 )); then
+    fail 'Enter no more than 256 excluded UDP ports.'
+    return 1
+  fi
+  for token in "${tokens[@]}"; do
+    if [[ ! $token =~ ^[0-9]{1,5}$ ]]; then
+      fail "Invalid excluded UDP port: $token"
+      return 1
+    fi
+    port=$((10#$token))
+    if (( port < 1 || port > 65535 )); then
+      fail "Excluded UDP ports must be from 1 to 65535: $token"
+      return 1
+    fi
+    if [[ -z ${seen[$port]+x} ]]; then
+      seen[$port]=1
+      normalized_exclusions+=("$port")
     fi
   done
 }
@@ -214,42 +316,56 @@ open_ports() {
 }
 
 change_listener_port() {
-  local config=/root/udp/config.json current new_port port_number backup
-  [[ -r $config ]] || { fail 'UDP Custom config was not found. Install/repair UDP Custom first.'; pause; return 1; }
-  command -v python3 >/dev/null 2>&1 || { fail 'python3 is required to safely edit the UDP Custom config.'; pause; return 1; }
-  current=$(python3 - "$config" <<'PY'
-import json, re, sys
-try:
-    with open(sys.argv[1], encoding='utf-8') as stream:
-        data = json.load(stream)
-    listen = data.get('listen', '')
-    match = re.fullmatch(r'.*:([0-9]{1,5})', listen)
-    if not match:
-        raise ValueError('unsupported listen address')
-    print(match.group(1))
-except Exception as error:
-    print(f'Could not read the current listener port: {error}', file=sys.stderr)
-    sys.exit(1)
-PY
-  ) || { fail 'Could not read the UDP Custom listener from config.json.'; pause; return 1; }
+  local config=/root/udp/config.json current new_port port_number backup exclusions
+  [[ -f $config && ! -L $config && -r $config ]] || { fail 'A regular UDP Custom config was not found. Install/repair UDP Custom first.'; pause; return 1; }
+  if ! ensure_python3; then
+    fail 'Could not install python3, which is needed to safely edit the UDP Custom config.'
+    pause
+    return 1
+  fi
+  current=$(read_listener_port) || { fail 'Could not read the UDP Custom listener from config.json.'; pause; return 1; }
   printf 'New UDP Custom listener port [current %s]: ' "$current"
   read -r new_port || return 0
   new_port=${new_port:-$current}
   [[ $new_port =~ ^[0-9]{1,5}$ ]] || { fail 'Enter one port number from 1 to 65535.'; pause; return 1; }
   port_number=$((10#$new_port))
   (( port_number >= 1 && port_number <= 65535 )) || { fail 'Listener port must be from 1 to 65535.'; pause; return 1; }
+  exclusions=$(current_udp_exclusions)
+  if [[ ,$exclusions, == *,$port_number,* ]]; then
+    fail "UDP port $port_number is reserved in the exclusion list. Remove it from exclusions before making it the listener."
+    pause
+    return 1
+  fi
   if [[ $port_number == "$current" ]]; then
     printf 'UDP Custom already listens on UDP %s.\n' "$current"
     pause
     return 0
   fi
-  if command -v ss >/dev/null 2>&1 && ss -H -lun "sport = :$port_number" 2>/dev/null | grep -q .; then
+  if ! command -v ss >/dev/null 2>&1; then
+    if ! command -v apt-get >/dev/null 2>&1 || ! apt-get update || ! apt-get install -y --no-install-recommends iproute2; then
+      fail 'Could not install iproute2 to check whether the UDP port is already in use.'
+      pause
+      return 1
+    fi
+  fi
+  local port_listeners
+  port_listeners=$(ss -H -lun "sport = :$port_number" 2>/dev/null) || { fail 'Could not inspect UDP listening sockets with ss.'; pause; return 1; }
+  if [[ -n $port_listeners ]]; then
     fail "UDP port $port_number is already in use. Choose an unused port."
     pause
     return 1
   fi
   backup=$(mktemp /root/udp/config.json.ssh-one-bak.XXXXXX) || { fail 'Could not create a config backup.'; pause; return 1; }
   cp -p -- "$config" "$backup" || { rm -f -- "$backup"; fail 'Could not back up config.json.'; pause; return 1; }
+  restore_listener_config() {
+    local restore_tmp
+    restore_tmp=$(mktemp /root/udp/.config.json.restore.XXXXXX) || return 1
+    if cp -p -- "$backup" "$restore_tmp" && mv -fT -- "$restore_tmp" "$config"; then
+      return 0
+    fi
+    rm -f -- "$restore_tmp"
+    return 1
+  }
   if ! python3 - "$config" "$port_number" <<'PY'
 import json, os, stat, sys, tempfile
 path, port = sys.argv[1], sys.argv[2]
@@ -276,22 +392,151 @@ except BaseException:
     raise
 PY
   then
-    cp -p -- "$backup" "$config"
-    rm -f -- "$backup"
-    fail 'Could not update config.json; the original config was restored.'
+    if restore_listener_config && systemctl restart udp-custom.service && wait_for_udp_custom; then
+      rm -f -- "$backup"
+      fail 'Could not update config.json; the original config was restored and the service is active.'
+    else
+      fail "Could not update config.json or restore it; the backup remains at $backup."
+    fi
     pause
     return 1
   fi
-  if systemctl restart udp-custom.service; then
+  if systemctl restart udp-custom.service && wait_for_udp_custom; then
     rm -f -- "$backup"
     printf 'UDP Custom now listens on UDP %s. Open this port in the host and provider firewalls if needed.\n' "$port_number"
   else
-    cp -p -- "$backup" "$config"
-    rm -f -- "$backup"
-    systemctl restart udp-custom.service >/dev/null 2>&1 || true
-    fail 'UDP Custom could not start on the new port. The previous config was restored.'
+    if restore_listener_config && systemctl restart udp-custom.service && wait_for_udp_custom; then
+      rm -f -- "$backup"
+      fail 'UDP Custom did not stay active on the new port. The previous config was restored.'
+    else
+      fail "UDP Custom failed after the port change; recovery backup remains at $backup."
+    fi
+    pause
     return 1
   fi
+  pause
+}
+
+write_udp_service_unit() {
+  local excluded_ports=$1 target=$2 exclude_arg=''
+  [[ -z $excluded_ports ]] || exclude_arg=" -exclude $excluded_ports"
+  cat > "$target" <<UNIT
+[Unit]
+Description=UDP Custom
+
+[Service]
+Type=simple
+WorkingDirectory=/root/udp
+ExecStart=/root/udp/udp-custom server$exclude_arg
+Restart=always
+RestartSec=2s
+User=root
+
+[Install]
+WantedBy=default.target
+UNIT
+}
+
+configure_exclusions() {
+  local config=/etc/ssh-one/udp-exclude-ports unit=/etc/systemd/system/udp-custom.service
+  local current='' input new='' unit_backup state_backup='' unit_tmp state_tmp='' state_existed=0 listener_port port
+  [[ -x /root/udp/udp-custom && -f $unit && ! -L $unit ]] || { fail 'Install/repair UDP Custom before changing excluded ports.'; pause; return 1; }
+  [[ ! -L $config ]] || { fail 'The UDP exclusion file is a symbolic link; it was not changed.'; pause; return 1; }
+  if ! grep -Eq '^ExecStart=/root/udp/udp-custom server([[:space:]]+-exclude[[:space:]][0-9,]+)?$' "$unit"; then
+    fail 'The UDP Custom service unit is not managed by SSH-one; excluded ports were not changed.'
+    pause
+    return 1
+  fi
+  current=$(current_udp_exclusions)
+  if ! ensure_python3; then
+    fail 'Could not install python3 to validate excluded ports against the listener.'
+    pause
+    return 1
+  fi
+  listener_port=$(read_listener_port) || { fail 'Could not read the UDP Custom listener from config.json.'; pause; return 1; }
+  printf 'UDP ports to exclude from UDP Custom (comma-separated; leave empty for none) [current: %s]: ' "${current:-none}"
+  IFS= read -r input || return 0
+  if ! normalize_exclusions "$input"; then pause; return 1; fi
+  if (( ${#normalized_exclusions[@]} > 0 )); then
+    local IFS=,
+    new="${normalized_exclusions[*]}"
+  fi
+  for port in "${normalized_exclusions[@]}"; do
+    if [[ $port == "$listener_port" ]]; then
+      fail "UDP port $listener_port is the UDP Custom listener and cannot be excluded."
+      pause
+      return 1
+    fi
+  done
+  if [[ $new == "$current" ]]; then
+    printf 'UDP Custom exclusions are unchanged.\n'
+    pause
+    return 0
+  fi
+
+  unit_backup=$(mktemp /etc/systemd/system/.udp-custom.backup.XXXXXX) || { fail 'Could not back up the UDP Custom service unit.'; pause; return 1; }
+  cp -a -- "$unit" "$unit_backup" || { rm -f -- "$unit_backup"; fail 'Could not back up the UDP Custom service unit.'; pause; return 1; }
+  if [[ -e $config ]]; then
+    [[ -f $config && ! -L $config ]] || { rm -f -- "$unit_backup"; fail 'The UDP exclusion file is not a regular file.'; pause; return 1; }
+    state_backup=$(mktemp /etc/ssh-one/.udp-exclude.backup.XXXXXX) || { rm -f -- "$unit_backup"; fail 'Could not back up UDP exclusions.'; pause; return 1; }
+    cp -a -- "$config" "$state_backup" || { rm -f -- "$unit_backup" "$state_backup"; fail 'Could not back up UDP exclusions.'; pause; return 1; }
+    state_existed=1
+  fi
+
+  unit_tmp=$(mktemp /etc/systemd/system/.udp-custom.service.XXXXXX) || { rm -f -- "$unit_backup" "$state_backup"; fail 'Could not stage the UDP Custom service unit.'; pause; return 1; }
+  if ! write_udp_service_unit "$new" "$unit_tmp"; then
+    rm -f -- "$unit_tmp"
+    rm -f -- "$unit_backup" "$state_backup"
+    fail 'Could not prepare the UDP Custom service unit.'
+    pause
+    return 1
+  fi
+  if ! chmod 0644 "$unit_tmp"; then
+    rm -f -- "$unit_tmp" "$unit_backup" "$state_backup"
+    fail 'Could not prepare the UDP Custom service unit.'
+    pause
+    return 1
+  fi
+  state_tmp=$(mktemp /etc/ssh-one/.udp-exclude-ports.new.XXXXXX) || { rm -f -- "$unit_tmp" "$unit_backup" "$state_backup"; fail 'Could not stage UDP exclusions.'; pause; return 1; }
+  if ! printf '%s\n' "$new" > "$state_tmp" || ! chmod 0600 "$state_tmp"; then
+    rm -f -- "$state_tmp" "$unit_tmp" "$unit_backup" "$state_backup"
+    fail 'Could not prepare UDP exclusions.'
+    pause
+    return 1
+  fi
+
+  restore_previous_settings() {
+    local failed=0
+    if (( state_existed )); then
+      cp -a -- "$state_backup" /etc/ssh-one/.udp-exclude-ports.rollback && mv -fT -- /etc/ssh-one/.udp-exclude-ports.rollback "$config" || failed=1
+    else
+      rm -f -- "$config" || failed=1
+    fi
+    cp -a -- "$unit_backup" /etc/systemd/system/.udp-custom.service.rollback && mv -fT -- /etc/systemd/system/.udp-custom.service.rollback "$unit" || failed=1
+    systemctl daemon-reload >/dev/null 2>&1 || failed=1
+    systemctl restart udp-custom.service >/dev/null 2>&1 && wait_for_udp_custom || failed=1
+    return "$failed"
+  }
+
+  if ! mv -fT -- "$state_tmp" "$config"; then
+    rm -f -- "$state_tmp" "$unit_tmp" "$unit_backup" "$state_backup"
+    fail 'Could not save UDP exclusions; the previous settings were kept.'
+    pause
+    return 1
+  fi
+
+  if ! mv -fT -- "$unit_tmp" "$unit" || ! systemctl daemon-reload || ! systemctl restart udp-custom.service || ! wait_for_udp_custom; then
+    if restore_previous_settings; then
+      rm -f -- "$unit_backup" "$state_backup" "$state_tmp"
+      fail 'UDP Custom did not stay active with the new exclusions. The previous settings were restored.'
+    else
+      fail "UDP Custom could not be restored. Recovery copies remain at $unit_backup and ${state_backup:-no previous exclusion file}."
+    fi
+    pause
+    return 1
+  fi
+  rm -f -- "$unit_backup" "$state_backup" "$state_tmp"
+  printf 'UDP Custom exclusion list updated and service restarted: %s\n' "${new:-none}"
   pause
 }
 
@@ -328,9 +573,12 @@ create_udp_user() {
     return 1
   fi
   if ! printf '%s:%s\n' "$username" "$password" | chpasswd; then
-    userdel "$username" >/dev/null 2>&1 || true
     unset password confirmation
-    fail 'Could not set the account password; the incomplete account was removed.'
+    if userdel "$username" >/dev/null 2>&1; then
+      fail 'Could not set the account password; the incomplete account was removed.'
+    else
+      fail "Could not set the account password or remove the incomplete account. Review and remove $username manually."
+    fi
     pause
     return 1
   fi
@@ -393,16 +641,16 @@ delete_udp_user() {
 }
 
 restart_udp() {
-  if ! systemctl list-unit-files udp-custom.service udpgw.service --no-legend 2>/dev/null | grep -q 'udp-custom\|udpgw'; then
-    fail 'UDP Custom service units are not installed. Choose Install/repair UDP Custom first.'
+  if ! systemctl list-unit-files udp-custom.service --no-legend 2>/dev/null | grep -q 'udp-custom'; then
+    fail 'The UDP Custom service unit is not installed. Choose Install/repair UDP Custom first.'
     pause
     return 1
   fi
-  if systemctl restart udp-custom.service udpgw.service; then
-    printf 'UDP Custom services restarted.\n'
-    systemctl --no-pager --full status udp-custom.service udpgw.service || true
+  if systemctl restart udp-custom.service && wait_for_udp_custom; then
+    printf 'UDP Custom service restarted.\n'
+    systemctl --no-pager --full status udp-custom.service || true
   else
-    fail 'Could not restart one or more UDP Custom services.'
+    fail 'UDP Custom did not stay active after restart.'
   fi
   pause
 }
@@ -412,24 +660,26 @@ while true; do
   printf '%s\n' '================ SSH-one UDP & Port Menu ================'
   printf '%s\n' '1. Open port(s) in host firewall (default UDP 1-65535; customizable)'
   printf '%s\n' '2. Change UDP Custom listener port (default 36712)'
-  printf '%s\n' '3. Check UDP Custom service status'
-  printf '%s\n' '4. Install/repair UDP Custom'
-  printf '%s\n' '5. Create UDP Custom account'
-  printf '%s\n' '6. List UDP Custom accounts'
-  printf '%s\n' '7. Delete UDP Custom account'
-  printf '%s\n' '8. Restart UDP Custom services'
+  printf '%s\n' '3. Configure excluded UDP ports (defaults: 500, 1701, 2200, 4500, 7070)'
+  printf '%s\n' '4. Check UDP Custom service status'
+  printf '%s\n' '5. Install/repair UDP Custom'
+  printf '%s\n' '6. Create UDP Custom account'
+  printf '%s\n' '7. List UDP Custom accounts'
+  printf '%s\n' '8. Delete UDP Custom account'
+  printf '%s\n' '9. Restart UDP Custom service'
   printf '%s\n' '0. Back to main menu'
   printf '%s\n' '=========================================================='
   read -r -p 'Select an option: ' choice || exit 0
   case $choice in
     1) open_ports || true ;;
     2) change_listener_port || true ;;
-    3) show_status ;;
-    4) install_udp || true ;;
-    5) create_udp_user || true ;;
-    6) list_udp_users ;;
-    7) delete_udp_user || true ;;
-    8) restart_udp || true ;;
+    3) configure_exclusions || true ;;
+    4) show_status ;;
+    5) install_udp || true ;;
+    6) create_udp_user || true ;;
+    7) list_udp_users ;;
+    8) delete_udp_user || true ;;
+    9) restart_udp || true ;;
     0) exit 0 ;;
     *) fail 'Invalid option.'; pause ;;
   esac

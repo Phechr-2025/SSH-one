@@ -203,5 +203,20 @@ if [[ ! -s /etc/ssh-one/runtime-files.sha256 ]]; then
 fi
 mv -fT -- /etc/ssh-one/.installation-complete.new /etc/ssh-one/installation-complete || fail 'could not activate the version marker.'
 committed=1
-note "updated ${#new_target[@]} managed commands and menus to $release_version."
-note 'VPN binaries, account/configuration data, operating-system packages, and firewall rules were preserved.'
+note "Update complete: $installed_version -> $release_version."
+note "Installed or refreshed ${#new_target[@]} managed files, including commands and menus; removed ${#removed_targets[@]} obsolete managed files when their recorded checksums matched."
+note 'Account data, service configuration, VPN binaries, operating-system packages, and firewall rules were preserved.'
+note 'The VPS will reboot in 10 seconds to activate the updated commands and menu. The SSH connection may close.'
+for remaining in {10..1}; do
+  printf '\rRestarting VPS in %2d seconds...' "$remaining"
+  sleep 1
+done
+printf '\n'
+if command -v systemctl >/dev/null 2>&1 && systemctl reboot; then
+  note 'reboot request sent.'
+elif [[ -x /sbin/reboot ]]; then
+  note 'systemctl reboot failed; trying /sbin/reboot.'
+  /sbin/reboot || fail 'automatic reboot failed; run reboot manually.'
+else
+  fail 'automatic reboot failed; run reboot manually.'
+fi

@@ -63,7 +63,7 @@ if ! install -d -m 0755 /etc/ssh-one; then
 	report_error "Could not create the SSH-one state directory."
 	exit 1
 fi
-if ! printf 'v20 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
+if ! printf 'v23 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
 	report_error "Could not write the installation-in-progress marker."
 	exit 1
 fi
@@ -98,7 +98,7 @@ backup_preexisting_paths() {
 		fi
 	done < "$manifest"
 	mv -fT -- "$preexisting_tmp" "$command_backup/preexisting-managed-bin.tsv" || { report_error "Could not save the pre-install command list."; return 1; }
-	for path in /usr/local/bin/xray /usr/local/bin/trojan-go /usr/local/bin/ws-tls /usr/local/bin/ws-nontls /usr/local/bin/ws-ovpn /usr/local/bin/ohpserver /bin/udpgw /root/udp/udp-custom; do
+	for path in /usr/local/bin/xray /usr/local/bin/trojan-go /usr/local/bin/ws-tls /usr/local/bin/ws-nontls /usr/local/bin/ws-ovpn /usr/local/bin/ohpserver /root/udp/udp-custom; do
 		if [[ -L "$path" ]]; then
 			report_error "A symbolic link already uses the runtime path $path. Resolve this collision before installing."
 			return 1
@@ -232,19 +232,19 @@ echo "" | tee -a /root/log-install.txt
 echo "----------------------------------------------------------------------------" | tee -a /root/log-install.txt
 echo ""  | tee -a /root/log-install.txt
 echo "   >>> Service & Port"  | tee -a /root/log-install.txt
-echo "   - SlowDNS SSH             : ALL Port SSH"  | tee -a /root/log-install.txt
 echo "   - OpenSSH                 : 22, 2253"  | tee -a /root/log-install.txt
-echo "   - OpenVPN                 : TCP 1194, UDP 2200, SSL 990"  | tee -a /root/log-install.txt
-echo "   - Stunnel5                : 443, 445"  | tee -a /root/log-install.txt
-echo "   - Dropbear                : 443, 109, 143"  | tee -a /root/log-install.txt
+echo "   - OpenVPN                 : TCP 1194, UDP 2200, TLS/TCP 990"  | tee -a /root/log-install.txt
+echo "   - SSLH / SSH Websocket    : TCP 443 (TLS multiplex), HTTP 8880"  | tee -a /root/log-install.txt
+echo "   - Stunnel5                : TCP 445, 777, 990"  | tee -a /root/log-install.txt
+echo "   - Dropbear                : TCP 109, 143, 1153"  | tee -a /root/log-install.txt
 echo "   - CloudFront Websocket    : "  | tee -a /root/log-install.txt
 echo "   - SSH Websocket TLS       : 443"  | tee -a /root/log-install.txt
 echo "   - SSH Websocket HTTP      : 8880"  | tee -a /root/log-install.txt
 echo "   - Websocket OpenVPN       : 2086"  | tee -a /root/log-install.txt
-echo "   - Badvpn                  : 7100, 7200, 7300"  | tee -a /root/log-install.txt
+echo "   - BadVPN UDPGW            : TCP 7100, 7200, 7300 (loopback gateway)"  | tee -a /root/log-install.txt
 echo "   - Nginx                   : 89"  | tee -a /root/log-install.txt
 echo "   - Wireguard               : 7070"  | tee -a /root/log-install.txt
-echo "   - L2TP/IPSEC VPN          : 1701"  | tee -a /root/log-install.txt
+echo "   - L2TP/IPsec              : UDP 500, 1701, 4500"  | tee -a /root/log-install.txt
 echo "   - PPTP VPN                : 1732"  | tee -a /root/log-install.txt
 echo "   - SSTP VPN                : 444"  | tee -a /root/log-install.txt
 echo "   - Shadowsocks-R           : 1443-1543"  | tee -a /root/log-install.txt
@@ -260,7 +260,7 @@ echo "   - OHP SSH                 : 8181"  | tee -a /root/log-install.txt
 echo "   - OHP Dropbear            : 8282"  | tee -a /root/log-install.txt
 echo "   - OHP OpenVPN             : 8383"  | tee -a /root/log-install.txt
 echo "   - TrojanGo                : 2087"  | tee -a /root/log-install.txt
-echo "   - UDP Custom              : firewall UDP 1-65535 by default (customizable); listener 36712/UDP by default (customizable)" | tee -a /root/log-install.txt
+echo "   - UDP Custom              : UDP 1-65535 by default; excludes 500, 1701, 2200, 4500, 7070; config listener defaults to 36712" | tee -a /root/log-install.txt
 echo ""  | tee -a /root/log-install.txt
 echo "   >>> Server Information & Other Features"  | tee -a /root/log-install.txt
 echo "   - Timezone                : Asia/Kuala_Lumpur (GMT +8)"  | tee -a /root/log-install.txt
@@ -325,7 +325,7 @@ if passwd -S root 2>/dev/null | awk '$2 == "L" || $2 == "NP" { locked=1 } END { 
 	report_error "Warning: root has no usable password; password login cannot work until you set one in the VPS console. SSH key access may still work."
 fi
 
-printf 'v20\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
+printf 'v23\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
 mv -fT -- /etc/ssh-one/.installation-complete.new /etc/ssh-one/installation-complete || { report_error "Could not activate the installation marker."; exit 1; }
 rm -f /etc/ssh-one/install-in-progress || { report_error "Could not remove the installation-in-progress marker."; exit 1; }
 printf 'Installation complete. SSH config and TCP 22/2253 listeners passed checks. VPS will reboot in 10 seconds.\n' | tee -a /root/log-install.txt

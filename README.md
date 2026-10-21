@@ -25,7 +25,7 @@
 
 > **ใช้กับ VPS ใหม่เท่านั้น** ไม่รองรับอัปเกรดหรือติดตั้งต่อจากงานที่ค้าง
 
-1. แตก ZIP แล้วอัปโหลด **ไฟล์และโฟลเดอร์ข้างใน** ไว้ที่รากของ repository อย่าวางในโฟลเดอร์ <code>SSH-one-v20</code>
+1. แตก ZIP แล้วอัปโหลด **ไฟล์และโฟลเดอร์ข้างใน** ไว้ที่รากของ repository อย่าวางในโฟลเดอร์ <code>SSH-one-v23</code>
 2. ใช้ repository ชื่อ <code>Phechr-2025/SSH-one</code> และ branch <code>main</code> หรือแก้ชื่อในคำสั่งติดตั้งให้ตรง repository ของคุณ
 3. เข้า VPS ด้วยบัญชี <code>root</code> แล้วรัน:
 
@@ -37,27 +37,28 @@
 
 เมื่อตรวจ SSH ผ่าน จะนับถอยหลัง 10 วินาทีแล้ว reboot อัตโนมัติ หากไม่ผ่านจะหยุดและบันทึกสาเหตุที่ <code>/root/log-install.txt</code> ระบบยังตั้ง reboot ประจำวันเวลา 05:00 (GMT+8)
 
-ค่าเริ่มต้นจะติดตั้ง UDP Custom อัตโนมัติ หลังเข้า VPS แล้วใช้คำสั่ง <code>menu</code> และเลือกข้อ 1 เพื่อเปิด/ปรับพอร์ต ตรวจสถานะ เปลี่ยนพอร์ต listener จัดการบัญชี หรือติดตั้ง/ซ่อม UDP Custom ตัวติดตั้งตรวจว่าเมนูถูกลงเป็นคำสั่งที่เรียกใช้ได้ก่อนจบ; หากชื่อ <code>menu</code> ชนกับคำสั่งอื่น ให้ใช้ <code>/usr/bin/menu</code>
+ค่าเริ่มต้นจะติดตั้ง UDP Custom อัตโนมัติ หลังเข้า VPS แล้วใช้คำสั่ง <code>menu</code> และเลือกข้อ 1 เพื่อเปิดพอร์ต เปลี่ยน listener ตั้งพอร์ต UDP ที่ต้องยกเว้น ตรวจสถานะ จัดการบัญชี หรือติดตั้ง/ซ่อม UDP Custom; ตัวติดตั้งจะเปิด UDP 1–65535 เป็นค่าเริ่มต้น และยกเว้นพอร์ตที่ระบุได้ ตัวติดตั้งตรวจว่าเมนูถูกลงเป็นคำสั่งที่เรียกใช้ได้ก่อนจบ; หากชื่อ <code>menu</code> ชนกับคำสั่งอื่น ให้ใช้ <code>/usr/bin/menu</code>
 
 หากย้าย repository ให้แก้ <code>repository.conf</code> และ owner/repository/branch ในคำสั่งติดตั้ง
 
 ## อัปเดตและถอนการติดตั้ง
 
-ถ้าเครื่องเดิมยังเป็น v17 ให้เริ่มอัปเดตด้วยตัว bootstrap v20 นี้ (ถ้าเปลี่ยน repository ให้เปลี่ยน URL ให้ตรงด้วย):
+ถ้าเครื่องเดิมยังเป็น v17 ให้เริ่มอัปเดตด้วย bootstrap รุ่น v23 นี้ (ถ้าเปลี่ยน repository ให้แก้ URL ให้ตรงด้วย):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/update/updatemenu.sh)
 ```
 
-ถ้า v18 หยุดด้วยข้อความ <code>a pre-existing command has no safe backup: /usr/bin/about</code> ให้แก้โค้ด v20 ขึ้น repository ก่อน แล้วรันคำสั่งกู้คืนนี้บน VPS เดิม คำสั่งนี้ลงทะเบียนคำสั่ง/เมนูที่ขาดต่อจากจุดติดตั้งเดิม โดยไม่ติดตั้งบริการซ้ำ:
+ถ้า v18 หยุดด้วยข้อความ <code>a pre-existing command has no safe backup: /usr/bin/about</code> ให้อัปโหลดไฟล์ v23 ขึ้น repository ก่อน แล้วรันคำสั่งกู้คืนนี้บน VPS เดิม คำสั่งนี้ลงทะเบียนคำสั่ง/เมนูที่ขาดต่อจากจุดติดตั้งเดิม โดยไม่ติดตั้งบริการซ้ำ:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Phechr-2025/SSH-one/main/recover-v18.sh)
 ```
 
-- อัปเดตจากเมนูหลักข้อ **21** หรือรัน <code>ssh-one-update</code> ด้วย root ตัวอัปเดตดาวน์โหลด ZIP จาก repository ที่บันทึกไว้ ตรวจ version และ syntax ของสคริปต์ แล้วเตรียมไฟล์ทั้งหมดก่อนสลับใช้งาน หากขั้นตอนแทนไฟล์หรือบันทึกทะเบียนไม่สำเร็จ จะย้อนคืนไฟล์ที่เปลี่ยนไป
+- อัปเดตจากเมนูหลักข้อ **21** หรือรัน <code>ssh-one-update</code> ด้วย root ตัวอัปเดตดาวน์โหลด ZIP จาก repository ที่บันทึกไว้ ตรวจ version และ syntax ของสคริปต์ แล้วเตรียมไฟล์ทั้งหมดก่อนสลับใช้งาน หากขั้นตอนแทนไฟล์หรือบันทึกทะเบียนไม่สำเร็จ จะย้อนคืนไฟล์ที่เปลี่ยนไป เมื่อสำเร็จจะแสดงรุ่นเดิมและรุ่นใหม่ จำนวนไฟล์ที่อัปเดต/ลบ แล้วนับถอยหลัง 10 วินาทีก่อน reboot
 - อัปเดตไฟล์คำสั่งและเมนูที่ระบุใน <code>update/managed-files.tsv</code> รวมถึงตัวอัปเดต/ถอนติดตั้ง บันทึก checksum ไว้ใช้ตรวจไฟล์ค้างและคืนไฟล์เดิมที่มีอยู่ก่อนติดตั้ง หากเครื่อง v17 ไม่มีคำสั่ง <code>menu</code> ให้ใช้ bootstrap ด้านบนก่อน แล้วลอง <code>/usr/bin/menu</code>
 - การอัปเดตนี้ไม่เปลี่ยนบัญชี/ไฟล์ตั้งค่าบริการ, firewall, แพ็กเกจระบบ หรือไบนารี VPN ที่ดาวน์โหลดจาก upstream แยกต่างหาก
+- เมนูแสดงรุ่นจาก marker ที่บันทึกหลังติดตั้ง/อัปเดต; หน้าหลักเพิ่มข้อมูลเครื่อง, bandwidth รายวัน/เมื่อวาน/เดือนนี้ และจำนวนบัญชี ส่วนข้อ **13** แสดงตารางพอร์ต
 - ถอนจากเมนูหลักข้อ **26** หรือรัน <code>ssh-one-uninstall</code> ด้วย root แล้วพิมพ์ <code>UNINSTALL</code> สคริปต์จะหยุดเฉพาะ service unit ที่ตรวจพบว่าเรียกไฟล์ของ SSH-one และลบไฟล์ที่ checksum ยังตรงกับไฟล์ที่ติดตั้งไว้ หากมีไฟล์เดิมอยู่ก่อนจะคืนไฟล์นั้น
 - การถอนลบข้อมูล/บัญชีใน <code>/etc/xray</code>, <code>/etc/trojan-go</code>, <code>/etc/wireguard</code>, <code>/root/udp</code> และ <code>/var/lib/crot</code> ซึ่งเป็นโฟลเดอร์ข้อมูลของบริการชุดนี้ สำรองข้อมูลก่อนถอน
 - เพื่อรักษาการเข้าถึง VPS ระบบจะเก็บ OpenSSH, แพ็กเกจ apt, Linux user ที่ไม่บันทึกเจ้าของ, กฎ firewall ที่ไม่มีป้าย SSH-one และไฟล์ที่ถูกแก้หลังติดตั้งไว้ การถอนจึงไม่สามารถลบรายการเหล่านี้โดยเดาได้อย่างปลอดภัย
@@ -143,24 +144,30 @@ Ubuntu 20.04 สิ้นสุด Standard Security Maintenance แล้ว �
 | --- | --- |
 | OpenSSH | TCP 22, 2253 |
 | Dropbear | TCP 109, 143, 1153 |
-| OpenVPN | TCP 1194, UDP 2200, SSL 990 |
-| Stunnel | TCP 443, 445 |
-| SSH WebSocket | TLS 443, HTTP 8880 |
-| BadVPN | TCP 7100, 7200, 7300 |
+| OpenVPN | TCP 1194, UDP 2200, TLS/TCP 990 |
+| SSLH / SSH WebSocket | TCP 443 (TLS multiplex), HTTP 8880 |
+| Stunnel5 | TCP 445, 777, 990 |
+| BadVPN UDPGW | TCP 7100, 7200, 7300 (loopback) |
 | WireGuard | UDP 7070 |
-| L2TP/IPsec, PPTP | UDP 1701, TCP 1732 |
+| L2TP/IPsec, PPTP | UDP 500, 1701, 4500; TCP 1732 |
 | SSTP | TCP 444 |
 | Shadowsocks-R | TCP 1443–1543 |
-| Shadowsocks OBFS | TLS 2443–2543, HTTP 3443–3543 |
-| Xray VMess | TLS 8443, non-TLS 80 |
-| Xray VLESS | TLS 8444, non-TLS 81 |
+| Shadowsocks OBFS | TCP/TLS 2443–2543, TCP/HTTP 3443–3543 |
+| Xray VMess | TCP/TLS 8443, TCP 80 |
+| Xray VLESS | TCP/TLS 8444, TCP 81 |
 | Xray Trojan, TrojanGo | TCP 2083, 2087 |
 | OHP | TCP 8181, 8282, 8383 |
-| UDP Custom | ช่วง UDP ใน firewall เริ่มต้น 1–65535 (ปรับได้); listener เริ่มต้น UDP 36712 (เปลี่ยนได้) |
+| UDP Custom | UDP 1–65535 ตามรูปแบบต้นฉบับ; ยกเว้นพอร์ตบริการ UDP อื่น 500, 1701, 2200, 4500, 7070 ไว้เป็นค่าเริ่มต้น; listener `:36712` |
+
+ตารางเป็นค่าพอร์ตที่ตั้งไว้ในสคริปต์; `443/TCP` เป็น listener ของ SSLH ที่ส่งต่อการเชื่อมต่อ TLS ไปยังบริการที่เกี่ยวข้อง ส่วน Stunnel ใช้ `445`, `777` และ `990` ตาม config จริง
 
 ค่าเริ่มต้นตัวติดตั้งเปิดช่วง UDP <code>1–65535</code> ใน UFW เมื่อ UFW ทำงาน และปรับช่วงได้จาก <code>menu → 1 → Open port(s)</code> โดยเลือก UDP, TCP หรือทั้งคู่ หากเว้นช่อง Protocol และ Ports ระบบใช้ UDP กับช่วง <code>1–65535</code> เป็นค่าเริ่มต้น
 
-ตัวบริการ UDP Custom ฟังอยู่ที่พอร์ตเดียว ค่าเริ่มต้นคือ <code>36712/UDP</code>; เปลี่ยน listener เป็นพอร์ตว่างอื่นในช่วง <code>1–65535</code> ได้จาก <code>menu → 1 → Change UDP Custom listener port</code> หลังเปลี่ยนให้เปิดพอร์ตนั้นใน firewall ของ VPS และ firewall/security group ของผู้ให้บริการด้วย การเปิดกฎ firewall เพียงอย่างเดียวไม่ได้ทำให้มีบริการฟังพอร์ตนั้น ช่วง <code>1–65535</code> กว้างและอาจชนกับบริการอื่น
+UDP Custom ใช้รูปแบบต้นฉบับที่รองรับ UDP ช่วง <code>1–65535</code>; ยกเว้น UDP <code>500, 1701, 2200, 4500, 7070</code> ไว้ให้ IPsec/L2TP, OpenVPN UDP และ WireGuard ของชุดติดตั้ง ส่วนค่า config listener เริ่มต้นคือ <code>:36712</code> แก้รายการยกเว้นได้ที่ <code>menu → 1 → 3</code> ซึ่งรีสตาร์ตบริการให้ด้วย เปิด UDP ใน firewall/VPS provider ให้ตรงกับบริการที่ใช้
+
+ค่า buffer <code>32 MB / 80 MB</code> คงตาม config ต้นฉบับ ไม่เพิ่มค่าสูงแบบเหมารวม เพราะไม่ได้ทำให้ ping ลดลงโดยอัตโนมัติและอาจเพิ่มการใช้ RAM/การหน่วงเมื่อเครือข่ายคับคั่ง หาก binary นำค่านี้ไปตั้ง socket buffer, Linux ยังอาจ clamp ตาม <code>rmem_max</code>/<code>wmem_max</code>; รอบนี้ไม่เปลี่ยน sysctl ระดับเครื่องโดยไม่มีการวัดและตรวจผลจริง
+
+ค่า ping และความเร็วจริงขึ้นกับระยะทาง/เส้นทางเครือข่าย, packet loss, การจำกัด UDP ของผู้ให้บริการ, CPU และ MTU ของ VPS กับไคลเอนต์ สคริปต์ไม่สามารถรับประกัน ping ต่ำสุดหรือความเร็วสูงสุดได้
 
 ## ข้อจำกัดที่ควรรู้
 

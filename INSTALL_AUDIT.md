@@ -1,4 +1,30 @@
-# รายงานตรวจสอบ SSH-one v20
+# รายงานตรวจสอบ SSH-one v23
+
+## เพิ่มใน v23
+
+- ปรับหน้าแรกเมนูเป็น Server Information: OS, kernel, uptime, CPU usage, RAM, domain, DNSTT, public VPS IP, bandwidth รายวัน/เมื่อวาน/เดือนนี้ และจำนวนบัญชีแยกตามบริการ
+- เมนูแสดง version จาก `/etc/ssh-one/installation-complete` เพื่อไม่ให้หัวเมนูค้างเป็น v19 หลังอัปเดต; การติดตั้งใหม่บันทึก `v23`
+- ข้อ 13 แสดงตารางพอร์ตในเมนู; ตรวจเทียบกับ config แล้วระบุ `443/TCP` เป็น SSLH front-end และ Stunnel เป็น `445/777/990` ตามไฟล์จริง
+- ตัวอัปเดตแสดง version เดิม → ใหม่, จำนวนไฟล์ที่แทน/เพิ่มและไฟล์เก่าที่ลบได้อย่างปลอดภัย แล้วนับ 10 วินาทีก่อนสั่ง reboot; เมื่ออัปเดตล้มเหลวจะไม่เริ่ม countdown/reboot
+- อัปเดต `ssh/slhost.sh` ให้บันทึก Public IPv4 ที่ผ่านการตรวจ DNS ลง `/etc/ssh-one/public-ip` สำหรับหน้าสรุป
+- แก้เงื่อนไข checksum ตอนทำความสะอาด `udpgw` เก่า ให้ลบ/คืนไฟล์ได้เฉพาะเมื่อ hash ตรงกับทะเบียน SSH-one; ถ้าไม่ตรงจะเก็บไว้
+- ไม่ปรับ kernel/sysctl หรือ buffer แบบเหมารวม และไม่อัปเดต OS packages, service configuration หรือ binary upstream อัตโนมัติ; ยังต้อง benchmark บน VPS จริงเพื่อวัด ping/throughput
+
+## เพิ่มใน v22
+
+- ตั้งค่า UDP Custom ให้ยกเว้นพอร์ตบริการ UDP ที่ชุดติดตั้งใช้จริง: IPsec/L2TP `500, 1701, 4500`, OpenVPN `2200`, WireGuard `7070`; ผู้ใช้แก้/ล้างรายการได้จากเมนู
+- เก็บค่า buffer `32 MB / 80 MB` ตาม config ต้นฉบับ เพราะเพิ่มค่าโดยไม่วัดบน VPS อาจกิน RAM และเพิ่มคิว/latency แทนที่จะลด ping
+- หาก binary ใช้ config นี้เป็น socket buffer, kernel อาจจำกัดค่าจริงตาม `rmem_max`/`wmem_max`; ไม่เปลี่ยน sysctl ส่วนกลางแบบเหมารวมโดยไม่มีผลวัด
+- ไม่ผูก UDP Custom กับ `network-online.target`; เพิ่มการรอเช็กสถานะ service หลัง restart และติดตั้ง `curl`, `coreutils`, `ca-certificates`, `python3` หรือ `iproute2` อัตโนมัติเมื่อจำเป็น
+- ปรับการติดตั้ง/เปลี่ยน listener ให้แจ้งเมื่อ firewall ตั้งกฎไม่ได้ และคงไฟล์กู้คืนไว้หาก rollback ล้มเหลว
+- ยังไม่มี benchmark บน VPS จริง; binary upstream เป็นไฟล์สำเร็จรูป จึงตรวจ/แก้ bug ภายในหรือจูนอัลกอริทึมของ binary ไม่ได้จากสคริปต์นี้
+
+## เพิ่มใน v21
+
+- เปลี่ยน UDP Custom binary/config ไปใช้ revision ที่ VVV เรียกใช้ โดย pin revision และ SHA-256
+- ใช้ `udp-custom.service` เพียงตัวเดียวตามรูปแบบเดิม; เพิ่มเมนูตั้งพอร์ต UDP ที่ต้องยกเว้น ซึ่งเขียนเป็น `-exclude` แล้วรีสตาร์ตบริการพร้อมย้อนค่าเดิมเมื่อเริ่มไม่สำเร็จ
+- การติดตั้ง/ซ่อมเก็บ `/root/udp/config.json`; ถอน `udpgw.service` รุ่น v20 ต่อเมื่อ unit ตรงทั้งไฟล์และ binary ตรง checksum ในทะเบียน; เก็บไฟล์ที่ตรวจยืนยันไม่ได้ไว้
+- เมนูยังคงเปิดไฟร์วอลล์ UDP 1–65535, เปลี่ยน listener, จัดการบัญชี และแสดงจำนวนบัญชี
 
 ## เพิ่มใน v20
 
@@ -112,4 +138,4 @@ upstream และ repository นี้ไม่มี `ssh/set.sh` แต่ `s
 
 ## ขอบเขตการตรวจรอบนี้
 
-ตรวจ ShellCheck ระดับ error กับ setup/install, ตัวอัปเดต, bootstrap, เมนู, ตัวถอน และไฟล์ shell ใน manifest; ตรวจความครบถ้วนและชื่อซ้ำของ manifest การติดตั้งและถอนจริงบน Ubuntu VPS, การทำงานของ services, provider firewall และการย้อนคืนไฟล์ในสภาพแวดล้อมจริงยังไม่ได้ทดสอบ
+รอบ v23 ตรวจ `git diff --check` และทบทวนเส้นทางอัปเดต/rollback, marker version, หน้าสรุป และตารางพอร์ตแล้ว แต่เครื่องนี้ไม่มี Bash/ShellCheck จึงยังไม่ได้รัน `bash -n` หรือ ShellCheck การติดตั้งจริง, benchmark ping/throughput, provider firewall และการทดสอบ rollback บน Ubuntu VPS ยังไม่ได้ทำ

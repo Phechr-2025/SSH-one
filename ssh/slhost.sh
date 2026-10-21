@@ -184,6 +184,7 @@ printf 'Public DNS confirms %s resolves to %s.\n' "$SSH_ONE_DOMAIN_HOST" "$IP"
 
 # Write host configuration only after Cloudflare and public DNS both confirm the A record.
 install -d -m 0755 /etc/xray /etc/v2ray /var/lib/crot /etc/ssh-one
+printf '%s\n' "$IP" > /etc/ssh-one/public-ip || fail 'could not save the verified VPS public IPv4 address.'
 printf 'IP=%s\n' "$SSH_ONE_DOMAIN_HOST" > /var/lib/crot/ipvps.conf
 printf '%s\n' "$SSH_ONE_DOMAIN_HOST" > /etc/xray/domain
 printf '%s\n' "$SSH_ONE_DOMAIN_HOST" > /etc/v2ray/domain
