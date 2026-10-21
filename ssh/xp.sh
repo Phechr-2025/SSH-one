@@ -116,6 +116,8 @@ done
 systemctl restart wg-quick@wg0
 
 #----- Auto Remove Vmess
+XRAY_ACCOUNTS_REMOVED=0
+TROJAN_GO_ACCOUNTS_REMOVED=0
 data=( `cat /etc/xray/config.json | grep '^###' | cut -d ' ' -f 2 | sort | uniq`);
 now=`date +"%Y-%m-%d"`
 for user in "${data[@]}"
@@ -125,9 +127,14 @@ d1=$(date -d "$exp" +%s)
 d2=$(date -d "$now" +%s)
 exp2=$(( (d1 - d2) / 86400 ))
 if [[ "$exp2" -le "0" ]]; then
-sed -i "/^### $user $exp/,/^},{/d" /etc/xray/config.json
-sed -i "/^### $user $exp/,/^},{/d" /etc/xray/config.json
+if command -v ssh-one-xray-accounts >/dev/null 2>&1 && [[ $(ssh-one-xray-accounts mode /etc/xray/config.json '#xray-vmess-tls') == empty ]]; then
+	ssh-one-xray-accounts remove-user /etc/xray/config.json '#xray-vmess-tls' "$user" && ssh-one-xray-accounts remove-user /etc/xray/config.json '#xray-vmess-nontls' "$user" || continue
+else
+	sed -i "/^### $user $exp/,/^},{/d" /etc/xray/config.json
+	sed -i "/^### $user $exp/,/^},{/d" /etc/xray/config.json
+fi
 rm -f /etc/xray/vmess-$user-tls.json /etc/xray/vmess-$user-nontls.json
+XRAY_ACCOUNTS_REMOVED=1
 fi
 done
 echo -e "$ORANGE Sucessfully XRAY VMESS WS Account Deleted !$NC"
@@ -142,8 +149,13 @@ d1=$(date -d "$exp" +%s)
 d2=$(date -d "$now" +%s)
 exp2=$(( (d1 - d2) / 86400 ))
 if [[ "$exp2" -le "0" ]]; then
-sed -i "/^#### $user $exp/,/^},{/d" /etc/xray/config.json
-sed -i "/^#### $user $exp/,/^},{/d" /etc/xray/config.json
+if command -v ssh-one-xray-accounts >/dev/null 2>&1 && [[ $(ssh-one-xray-accounts mode /etc/xray/config.json '#xray-vless-tls') == empty ]]; then
+	ssh-one-xray-accounts remove-user /etc/xray/config.json '#xray-vless-tls' "$user" && ssh-one-xray-accounts remove-user /etc/xray/config.json '#xray-vless-nontls' "$user" || continue
+else
+	sed -i "/^#### $user $exp/,/^},{/d" /etc/xray/config.json
+	sed -i "/^#### $user $exp/,/^},{/d" /etc/xray/config.json
+fi
+XRAY_ACCOUNTS_REMOVED=1
 fi
 done
 echo -e "$ORANGE Sucessfully XRAY VLESS WS Account Deleted !$NC"
@@ -158,8 +170,13 @@ d1=$(date -d "$exp" +%s)
 d2=$(date -d "$now" +%s)
 exp2=$(( (d1 - d2) / 86400 ))
 if [[ "$exp2" -le "0" ]]; then
-sed -i "/^#&# $user $exp/,/^},{/d" /etc/xray/config.json
-sed -i "/^#&# $user $exp/,/^},{/d" /etc/xray/config.json
+if command -v ssh-one-xray-accounts >/dev/null 2>&1 && [[ $(ssh-one-xray-accounts mode /etc/xray/config.json '#xray-trojan') == empty ]]; then
+	ssh-one-xray-accounts remove-user /etc/xray/config.json '#xray-trojan' "$user" || continue
+else
+	sed -i "/^#&# $user $exp/,/^},{/d" /etc/xray/config.json
+	sed -i "/^#&# $user $exp/,/^},{/d" /etc/xray/config.json
+fi
+XRAY_ACCOUNTS_REMOVED=1
 fi
 done
 echo -e "$ORANGE Sucessfully XRAY TROJAN WS Account Deleted !$NC"
@@ -174,7 +191,16 @@ d1=$(date -d "$exp" +%s)
 d2=$(date -d "$now" +%s)
 exp2=$(( (d1 - d2) / 86400 ))
 if [[ "$exp2" -le "0" ]]; then
-sed -i "/^### $user $exp/,/^},{/d" /etc/trojan-go/akun.conf
+trojan_config_tmp=$(mktemp /etc/trojan-go/.config.json.XXXXXX) || continue
+if jq --arg user "$user" '.password |= map(select(. != $user))' /etc/trojan-go/config.json > "$trojan_config_tmp" && chmod --reference=/etc/trojan-go/config.json "$trojan_config_tmp" && mv -fT -- "$trojan_config_tmp" /etc/trojan-go/config.json; then
+	sed -i "/^### $user $exp\$/d" /etc/trojan-go/akun.conf
+	TROJAN_GO_ACCOUNTS_REMOVED=1
+else
+	rm -f -- "$trojan_config_tmp"
+	echo "Could not remove expired Trojan-Go account $user from config." >&2
+fi
 fi
 done
 echo -e "$ORANGE Sucessfully XRAY TROJAN GO Account Deleted !$NC"
+if [[ $XRAY_ACCOUNTS_REMOVED == 1 ]]; then systemctl restart xray.service || echo 'Xray could not be restarted after account cleanup.' >&2; fi
+if [[ $TROJAN_GO_ACCOUNTS_REMOVED == 1 ]]; then systemctl restart trojan-go.service || echo 'Trojan-Go could not be restarted after account cleanup.' >&2; fi

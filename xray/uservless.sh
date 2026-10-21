@@ -9,7 +9,7 @@ MYIP=$(wget -qO- ipv4.icanhazip.com);
 MYIP=$(curl -s ipinfo.io/ip )
 MYIP=$(curl -sS ipv4.icanhazip.com)
 MYIP=$(curl -sS ifconfig.me )
-NUMBER_OF_CLIENTS=$(grep -c -E "^#### " "/etc/xray/config.json")
+NUMBER_OF_CLIENTS=$(grep -E "^#### " "/etc/xray/config.json" | awk '!seen[$2]++ {n++} END {print n+0}')
         if [[ ${NUMBER_OF_CLIENTS} == '0' ]]; then
                 echo -e "---------------------------------------------------"
                 echo -e "---------=[ Check XRAYS/Vless WS Config ]=---------"
@@ -27,7 +27,7 @@ NUMBER_OF_CLIENTS=$(grep -c -E "^#### " "/etc/xray/config.json")
         echo " Press CTRL+C to return"
 		echo -e "---------------------------------------------------"
         echo "     No  Expired   User"
-        grep -E "^#### " "/etc/xray/config.json" | cut -d ' ' -f 2-3 | nl -s ') '
+        grep -E "^#### " "/etc/xray/config.json" | awk '!seen[$2]++ {print $2, $3}' | nl -s ') '
         until [[ ${CLIENT_NUMBER} -ge 1 && ${CLIENT_NUMBER} -le ${NUMBER_OF_CLIENTS} ]]; do
                 if [[ ${CLIENT_NUMBER} == '1' ]]; then
                         read -rp "Select one client [1]: " CLIENT_NUMBER
@@ -36,10 +36,15 @@ NUMBER_OF_CLIENTS=$(grep -c -E "^#### " "/etc/xray/config.json")
                 fi
         done
 clear
-user=$(grep -E "^#### " "/etc/xray/config.json" | cut -d ' ' -f 2 | sed -n "${CLIENT_NUMBER}"p)
+user=$(grep -E "^#### " "/etc/xray/config.json" | awk '!seen[$2]++ {print $2}' | sed -n "${CLIENT_NUMBER}"p)
 domain=$(cat /etc/xray/domain)
-uuid=$(grep "},{" /etc/xray/config.json | cut -b 11-46 | sed -n "${CLIENT_NUMBER}"p)
-exp=$(grep -E "^#### " "/etc/xray/config.json" | cut -d ' ' -f 3 | sed -n "${CLIENT_NUMBER}"p)
+if command -v ssh-one-xray-accounts >/dev/null 2>&1; then
+	uuid=$(ssh-one-xray-accounts getid /etc/xray/config.json '#### ' "$user")
+else
+	uuid=$(grep "},{" /etc/xray/config.json | cut -b 11-46 | sed -n "${CLIENT_NUMBER}"p)
+fi
+exp=$(grep -E "^#### " "/etc/xray/config.json" | awk '!seen[$2]++ {print $3}' | sed -n "${CLIENT_NUMBER}"p)
+[[ -n $uuid ]] || { echo "Could not find the Xray ID for $user." >&2; exit 1; }
 hariini=`date -d "0 days" +"%Y-%m-%d"`
 tls="$(cat ~/log-install.txt | grep -w "Vless TLS" | cut -d: -f2|sed 's/ //g')"
 nontls="$(cat ~/log-install.txt | grep -w "Vless None TLS" | cut -d: -f2|sed 's/ //g')"

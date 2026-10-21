@@ -52,7 +52,8 @@ systemctl restart ws-nontls
 systemctl restart ssh-ohp
 systemctl restart dropbear-ohp
 systemctl restart openvpn-ohp
-useradd -e `date -d "$masaaktif days" +"%Y-%m-%d"` -s /bin/false -M $Login
+if ! getent group ssh-one-ssh >/dev/null 2>&1; then groupadd --system ssh-one-ssh || { echo "Could not create the SSH account group." >&2; exit 1; }; fi
+useradd -e "$(date -d "$masaaktif days" +"%Y-%m-%d")" -s /bin/false -M -G ssh-one-ssh "$Login" || { echo "Could not create the SSH account." >&2; exit 1; }
 expi="$(chage -l $Login | grep "Account expires" | awk -F": " '{print $2}')"
 echo -e "$Pass\n$Pass\n"|passwd $Login &> /dev/null
 hariini=`date -d "0 days" +"%Y-%m-%d"`
@@ -153,3 +154,4 @@ echo -e "=============================="
 echo -e "GET / HTTP/1.1[crlf]Host: [host][crlf]Upgrade: websocket[crlf][crlf]"
 echo -e "=============================="
 echo -e "Script Mod"
+command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created ssh || true

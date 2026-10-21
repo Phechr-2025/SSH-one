@@ -42,45 +42,6 @@ else
 domain=$IP2
 fi
 
-#Default
-cat > /etc/shadowsocks-libev/tls.json<<END
-{   
-    "server":"0.0.0.0",
-    "server_port":$tls,
-    "password":"tls",
-    "timeout":60,
-    "method":"aes-256-cfb",
-    "fast_open":true,
-    "no_delay":true,
-    "nameserver":"8.8.8.8",
-    "mode":"tcp_and_udp",
-    "plugin":"obfs-server",
-    "plugin_opts":"obfs=tls"
-}
-END
-cat > /etc/shadowsocks-libev/http.json <<-END
-{
-    "server":"0.0.0.0",
-    "server_port":$http,
-    "password":"http",
-    "timeout":60,
-    "method":"aes-256-cfb",
-    "fast_open":true,
-    "no_delay":true,
-    "nameserver":"8.8.8.8",
-    "mode":"tcp_and_udp",
-    "plugin":"obfs-server",
-    "plugin_opts":"obfs=http"
-}
-END
-chmod +x /etc/shadowsocks-libev/tls.json
-chmod +x /etc/shadowsocks-libev/http.json
-
-systemctl enable shadowsocks-libev-server@tls.service
-systemctl start shadowsocks-libev-server@tls.service
-systemctl enable shadowsocks-libev-server@http.service
-systemctl start shadowsocks-libev-server@http.service
-#
 echo ""
 echo "Masukkan Password"
 
@@ -159,3 +120,4 @@ echo -e "========================="
 echo -e "Link No TLS : $linkss2"
 echo -e "========================="
 echo -e "Script Mod"
+command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created shadowsocks || true

@@ -38,6 +38,7 @@ ovpn="$(netstat -nlpt | grep -i openvpn | grep -i 0.0.0.0 | awk '{print $4}' | c
 ovpn2="$(netstat -nlpu | grep -i openvpn | grep -i 0.0.0.0 | awk '{print $4}' | cut -d: -f2)"
 Login=Trial`</dev/urandom tr -dc X-Z0-9 | head -c4`
 hari="1"
+masaaktif=1
 Pass=1
 clear
 systemctl restart ws-tls
@@ -45,7 +46,8 @@ systemctl restart ws-nontls
 systemctl restart ssh-ohp
 systemctl restart dropbear-ohp
 systemctl restart openvpn-ohp
-useradd -e `date -d "$masaaktif days" +"%Y-%m-%d"` -s /bin/false -M $Login
+if ! getent group ssh-one-ssh >/dev/null 2>&1; then groupadd --system ssh-one-ssh || { echo "Could not create the SSH account group." >&2; exit 1; }; fi
+useradd -e "$(date -d "$masaaktif days" +"%Y-%m-%d")" -s /bin/false -M -G ssh-one-ssh "$Login" || { echo "Could not create the trial SSH account." >&2; exit 1; }
 exp="$(chage -l $Login | grep "Account expires" | awk -F": " '{print $2}')"
 hariini=`date -d "0 days" +"%Y-%m-%d"`
 expi=`date -d "$masaaktif days" +"%Y-%m-%d"`
@@ -86,3 +88,4 @@ echo -e "=============================="
 echo -e "GET / HTTP/1.1[crlf]Host: ${domain}[crlf]Upgrade: websocket[crlf][crlf]"
 echo -e "=============================="
 echo -e "Script Mod"
+command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created ssh-trial || true

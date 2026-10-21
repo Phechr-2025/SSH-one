@@ -34,7 +34,11 @@ fi
 # Link Hosting Kalian
 akbarvpn="${SSH_ONE_RAW_HOST}/ipsec"
 
-VPN_IPSEC_PSK='myvpn'
+VPN_IPSEC_PSK=$(openssl rand -hex 24)
+if [ -z "$VPN_IPSEC_PSK" ]; then
+  echo "Could not generate a private IPsec pre-shared key." >&2
+  exit 1
+fi
 NET_IFACE=$(ip -o $NET_IFACE -4 route show to default | awk '{print $5}');
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 source /etc/os-release
@@ -239,15 +243,10 @@ ms-dns $DNS_SRV2
 EOF
 fi
 
-# Create VPN credentials
-cat > /etc/ppp/chap-secrets <<EOF
-"$VPN_USER" l2tpd "$VPN_PASSWORD" *
-EOF
-
-VPN_PASSWORD_ENC=$(openssl passwd -1 "$VPN_PASSWORD")
-cat > /etc/ipsec.d/passwd <<EOF
-$VPN_USER:$VPN_PASSWORD_ENC:xauth-psk
-EOF
+# Start with no client credentials. Users are added explicitly from the menu.
+: > /etc/ppp/chap-secrets
+: > /etc/ipsec.d/passwd
+chmod 600 /etc/ppp/chap-secrets /etc/ipsec.d/passwd
 
 # Create PPTP config
 cat >/etc/pptpd.conf <<END

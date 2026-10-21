@@ -148,7 +148,6 @@ rm /etc/nginx/sites-available/default
 curl https://${akbarvpn}/nginx.conf > /etc/nginx/nginx.conf
 curl https://${akbarvpn}/vps.conf > /etc/nginx/conf.d/vps.conf
 sed -i 's/listen = \/var\/run\/php-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/fpm/pool.d/www.conf
-useradd -m vps;
 mkdir -p /home/vps/public_html
 echo "<?php phpinfo() ?>" > /home/vps/public_html/info.php
 chown -R www-data:www-data /home/vps/public_html

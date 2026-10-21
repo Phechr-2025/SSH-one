@@ -44,8 +44,12 @@ NUMBER_OF_CLIENTS=$(grep -c -E "^#&# " "/etc/xray/config.json")
 	done
 user=$(grep -E "^#&# " "/etc/xray/config.json" | cut -d ' ' -f 2 | sed -n "${CLIENT_NUMBER}"p)
 exp=$(grep -E "^#&# " "/etc/xray/config.json" | cut -d ' ' -f 3 | sed -n "${CLIENT_NUMBER}"p)
-sed -i "/^#&# $user $exp/,/^},{/d" /etc/xray/config.json
-sed -i "/^#&# $user $exp/,/^},{/d" /etc/xray/config.json
+if command -v ssh-one-xray-accounts >/dev/null 2>&1 && [[ $(ssh-one-xray-accounts mode /etc/xray/config.json '#xray-trojan') == empty ]]; then
+	ssh-one-xray-accounts remove /etc/xray/config.json '#xray-trojan' "$user" "$exp" || exit 1
+else
+	sed -i "/^#&# $user $exp/,/^},{/d" /etc/xray/config.json
+	sed -i "/^#&# $user $exp/,/^},{/d" /etc/xray/config.json
+fi
 systemctl restart xray.service
 service cron restart
 clear

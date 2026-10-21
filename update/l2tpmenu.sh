@@ -27,7 +27,7 @@ renewl2tp
 ;;
 4)
 clear
-menu
+exit 0
 ;;
 5)
 clear
@@ -35,6 +35,6 @@ exit
 ;;
 *)
 clear
-menu
+exit 0
 ;;
 esac

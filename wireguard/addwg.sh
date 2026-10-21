@@ -114,3 +114,4 @@ echo -e "Link WG  : http://$MYIP:89/$CLIENT_NAME.conf"
 echo -e "======================="
 echo -e "Script Mod"
 rm -f /root/wg0-client-$CLIENT_NAME.conf
+command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created wireguard || true

@@ -69,7 +69,7 @@ L2TP/IPSEC PSK VPN
 ============================
 IP/Host    : $PUBLIC_IP
 Domain     : $domain
-IPsec PSK  : myvpn
+IPsec PSK  : $(awk -F '"' '/: PSK / { print $2; exit }' /etc/ipsec.secrets)
 Username   : $VPN_USER
 Password   : $VPN_PASSWORD
 Created    : $hariini
@@ -77,3 +77,4 @@ Expired    : $exp
 ============================
 Script Mod
 EOF
+command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created l2tp || true

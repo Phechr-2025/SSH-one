@@ -72,7 +72,7 @@ cat > /etc/shadowsocks-libev/config.json <<END
 {
     "server":"0.0.0.0",
     "server_port":8488,
-    "password":"tes",
+    "password":"",
     "timeout":60,
     "method":"aes-256-cfb",
     "fast_open":true,
@@ -82,12 +82,9 @@ cat > /etc/shadowsocks-libev/config.json <<END
 END
 echo "#############################################"
 
-#mulai ~shadowsocks-libev~ server
-echo "#############################################"
-echo "mulai ss server"
-systemctl enable shadowsocks-libev.service
-systemctl start shadowsocks-libev.service
-echo "#############################################"
+# Do not start a default-account listener. Per-user instances start when an
+# account is created through addss.
+systemctl disable --now shadowsocks-libev.service >/dev/null 2>&1 || true
 
 #buat client config
 echo "#############################################"

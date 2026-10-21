@@ -63,8 +63,16 @@ if ! install -d -m 0755 /etc/ssh-one; then
 	report_error "Could not create the SSH-one state directory."
 	exit 1
 fi
-if ! printf 'v24 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
+if ! printf 'v25 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
 	report_error "Could not write the installation-in-progress marker."
+	exit 1
+fi
+if [[ -L /etc/ssh-one/menu-after-create || -e /etc/ssh-one/menu-after-create ]]; then
+	report_error "Unexpected menu setting file already exists; refusing to overwrite it."
+	exit 1
+fi
+if ! printf '0\n' > /etc/ssh-one/menu-after-create || ! chmod 0644 /etc/ssh-one/menu-after-create; then
+	report_error "Could not initialize the account-creation menu setting."
 	exit 1
 fi
 
@@ -330,7 +338,7 @@ if [[ ! $source_commit =~ ^[a-f0-9]{40}$ ]]; then source_commit='unknown'; fi
 printf '%s\n' "$source_commit" > /etc/ssh-one/.source-commit.new || { report_error "Could not prepare the GitHub source reference."; exit 1; }
 chmod 0644 /etc/ssh-one/.source-commit.new || { report_error "Could not set permissions on the GitHub source reference."; exit 1; }
 mv -fT -- /etc/ssh-one/.source-commit.new /etc/ssh-one/source-commit || { report_error "Could not activate the GitHub source reference."; exit 1; }
-printf 'v24\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
+printf 'v25\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
 mv -fT -- /etc/ssh-one/.installation-complete.new /etc/ssh-one/installation-complete || { report_error "Could not activate the installation marker."; exit 1; }
 rm -f /etc/ssh-one/install-in-progress || { report_error "Could not remove the installation-in-progress marker."; exit 1; }
 printf 'Installation complete. SSH config and TCP 22/2253 listeners passed checks. VPS will reboot in 10 seconds.\n' | tee -a /root/log-install.txt

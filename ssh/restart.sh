@@ -23,7 +23,9 @@ systemctl restart ssrmu
 systemctl restart ws-tls
 systemctl restart ws-nontls
 systemctl restart xray.service
-systemctl restart shadowsocks-libev
+if systemctl is-active --quiet shadowsocks-libev.service; then
+  systemctl restart shadowsocks-libev.service
+fi
 systemctl restart xl2tpd
 systemctl restart pptpd
 systemctl restart ipsec

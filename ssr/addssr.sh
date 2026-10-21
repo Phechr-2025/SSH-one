@@ -84,3 +84,4 @@ echo -e "=========================="
 echo -e "Link SSR    : ${ssr_link}"
 echo -e "=========================="
 echo -e "Script Mod"
+command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created ssr || true

@@ -115,6 +115,9 @@ Download_SSR(){
 	git clone -b akkariiin/master https://github.com/shadowsocksrr/shadowsocksr.git
 	cd "shadowsocksr"
 	cp "${ssr_folder}/config.json" "${config_user_file}"
+	# A fresh install starts with no SSR client records.
+	printf '[\n]\n' > "${config_user_mudb_file}"
+	chmod 600 "${config_user_mudb_file}"
 	cp "${ssr_folder}/mysql.json" "${ssr_folder}/usermysql.json"
 	cp "${ssr_folder}/apiconfig.py" "${config_user_api_file}"
 	sed -i "s/API_INTERFACE = 'sspanelv2'/API_INTERFACE = 'mudbjson'/" ${config_user_api_file}

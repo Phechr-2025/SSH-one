@@ -34,7 +34,7 @@ fi
 tr="$(cat ~/log-install.txt | grep -w "Trojan" | cut -d: -f2|sed 's/ //g')"
 until [[ $user =~ ^[a-zA-Z0-9_]+$ && ${user_EXISTS} == '0' ]]; do
 		read -rp "Password : " -e user
-		user_EXISTS=$(grep -w $user /etc/xray/config.json | wc -l)
+		user_EXISTS=$(awk -v name="$user" '$1 == "#&#" && $2 == name {found=1} END {print found+0}' /etc/xray/config.json)
 
 		if [[ ${user_EXISTS} == '1' ]]; then
 			echo ""
@@ -45,8 +45,16 @@ until [[ $user =~ ^[a-zA-Z0-9_]+$ && ${user_EXISTS} == '0' ]]; do
 read -p "Expired (Days) : " masaaktif
 hariini=`date -d "0 days" +"%Y-%m-%d"`
 exp=`date -d "$masaaktif days" +"%Y-%m-%d"`
-sed -i '/#xray-trojan$/a\#&# '"$user $exp"'\
+if command -v ssh-one-xray-accounts >/dev/null 2>&1; then
+	ssh-one-xray-accounts add /etc/xray/config.json '#xray-trojan' trojan "$user" "$exp" "$user" || exit 1
+else
+	if ! grep -Eq '^#&# ' /etc/xray/config.json; then
+		echo "Xray account helper is missing; refusing to modify the empty client configuration." >&2
+		exit 1
+	fi
+	sed -i '/#xray-trojan$/a\#&# '"$user $exp"'\
 },{"password": "'""$user""'","email": "'""$user""'"' /etc/xray/config.json
+fi
 systemctl restart xray.service
 trojanlink="trojan://${user}@${domain}:${tr}"
 service cron restart
@@ -64,3 +72,4 @@ echo -e "=========================="
 echo -e "Link TR  : ${trojanlink}"
 echo -e "=========================="
 echo -e "Script Mod"
+command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created trojan || true

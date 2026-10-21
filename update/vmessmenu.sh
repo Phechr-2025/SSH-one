@@ -35,7 +35,7 @@ userv2ray
 ;;
 6)
 clear
-menu
+exit 0
 ;;
 7)
 clear
@@ -43,6 +43,6 @@ exit
 ;;
 *)
 clear
-menu
+exit 0
 ;;
 esac

@@ -65,3 +65,4 @@ Expired   : $exp
 ============================
 Script Mod
 EOF
+command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created sstp || true

@@ -22,7 +22,6 @@ echo -e "${NC}${LIGHT}Fuck You!!"
 exit 0
 fi
 clear
-uuid=$(cat /etc/trojan-go/uuid.txt)
 source /var/lib/crot/ipvps.conf
 if [[ "$IP" = "" ]]; then
 domain=$(cat /etc/xray/domain)
@@ -41,7 +40,18 @@ until [[ $user =~ ^[a-zA-Z0-9_]+$ && ${user_EXISTS} == '0' ]]; do
 		fi
 	done
 read -p "Expired (Days) : " masaaktif
-sed -i '/"'""$uuid""'"$/a\,"'""$user""'"' /etc/trojan-go/config.json
+if ! jq -e '.password | type == "array"' /etc/trojan-go/config.json >/dev/null; then
+	echo "Trojan-Go password list is missing or invalid." >&2
+	exit 1
+fi
+trojan_config_tmp=$(mktemp /etc/trojan-go/.config.json.XXXXXX) || { echo "Could not stage the Trojan-Go config." >&2; exit 1; }
+if ! jq --arg user "$user" '.password += [$user]' /etc/trojan-go/config.json > "$trojan_config_tmp"; then
+	rm -f -- "$trojan_config_tmp"
+	echo "Could not update the Trojan-Go password list." >&2
+	exit 1
+fi
+chmod --reference=/etc/trojan-go/config.json "$trojan_config_tmp"
+mv -fT -- "$trojan_config_tmp" /etc/trojan-go/config.json || { rm -f -- "$trojan_config_tmp"; echo "Could not activate the Trojan-Go config." >&2; exit 1; }
 exp=`date -d "$masaaktif days" +"%Y-%m-%d"`
 hariini=`date -d "0 days" +"%Y-%m-%d"`
 echo -e "### $user $exp" >> /etc/trojan-go/akun.conf
@@ -63,3 +73,4 @@ echo -e "========================="
 echo -e "Link TrGo  : ${link}"
 echo -e "========================="
 echo -e "Script Mod"
+command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created trojango || true

@@ -31,7 +31,7 @@ cektrgo
 ;;
 5)
 clear
-menu
+exit 0
 ;;
 6)
 clear
@@ -39,6 +39,6 @@ exit
 ;;
 *)
 clear
-menu
+exit 0
 ;;
 esac

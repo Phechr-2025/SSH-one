@@ -103,7 +103,10 @@ show_status() {
       account_count=${#udp_accounts[@]}
     fi
   fi
-  printf '  SSH UDP Custom accounts: %s (managed by this menu)\n' "$account_count"
+  if command -v ssh-one-account-tools >/dev/null 2>&1; then
+    account_count=$(ssh-one-account-tools count-udp 2>/dev/null || printf '0')
+  fi
+  printf '  UDP accounts: %s\n' "$account_count"
   if [[ -r /root/udp/config.json ]]; then
     listen=$(sed -n 's/.*"listen"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /root/udp/config.json | head -n 1)
     [[ -n $listen ]] || listen='unknown'
@@ -540,8 +543,106 @@ configure_exclusions() {
   pause
 }
 
+ensure_udp_expiry_service() {
+  local service=/etc/systemd/system/ssh-one-udp-expiry.service
+  local timer=/etc/systemd/system/ssh-one-udp-expiry.timer
+  local service_tmp timer_tmp unit service_created=0 timer_created=0
+  command -v ssh-one-udp-expiry >/dev/null 2>&1 || { fail 'The UDP expiry helper is not installed. Update SSH-one first.'; return 1; }
+  for unit in "$service" "$timer"; do
+    [[ ! -L $unit ]] || { fail "Refusing to replace a symbolic-link systemd unit: $unit"; return 1; }
+    [[ ! -e $unit || -f $unit ]] || { fail "Refusing to replace a non-file systemd unit: $unit"; return 1; }
+  done
+  service_tmp=$(mktemp /etc/systemd/system/.ssh-one-udp-expiry.service.XXXXXX) || { fail 'Could not stage the UDP expiry service.'; return 1; }
+  timer_tmp=$(mktemp /etc/systemd/system/.ssh-one-udp-expiry.timer.XXXXXX) || { rm -f -- "$service_tmp"; fail 'Could not stage the UDP expiry timer.'; return 1; }
+  cat > "$service_tmp" <<'UNIT'
+[Unit]
+Description=Remove expired SSH-one UDP accounts
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ssh-one-udp-expiry
+User=root
+UNIT
+  cat > "$timer_tmp" <<'UNIT'
+[Unit]
+Description=Check SSH-one UDP account expirations
+
+[Timer]
+OnBootSec=10s
+OnUnitActiveSec=15s
+Unit=ssh-one-udp-expiry.service
+
+[Install]
+WantedBy=timers.target
+UNIT
+  if [[ -e $service ]] && ! cmp -s -- "$service_tmp" "$service"; then
+    rm -f -- "$service_tmp" "$timer_tmp"
+    fail 'An unrecognized SSH-one UDP expiry service unit already exists; it was not changed.'
+    return 1
+  fi
+  if [[ -e $timer ]] && ! cmp -s -- "$timer_tmp" "$timer"; then
+    rm -f -- "$service_tmp" "$timer_tmp"
+    fail 'An unrecognized SSH-one UDP expiry timer already exists; it was not changed.'
+    return 1
+  fi
+  if [[ ! -e $service ]]; then
+    if ! install -o root -g root -m 0644 "$service_tmp" "$service"; then
+      rm -f -- "$service_tmp" "$timer_tmp"
+      fail 'Could not install the UDP expiry service unit.'
+      return 1
+    fi
+    service_created=1
+  fi
+  if [[ ! -e $timer ]]; then
+    if ! install -o root -g root -m 0644 "$timer_tmp" "$timer"; then
+      rm -f -- "$service_tmp" "$timer_tmp"
+      (( service_created )) && rm -f -- "$service"
+      fail 'Could not install the UDP expiry timer unit.'
+      return 1
+    fi
+    timer_created=1
+  fi
+  rm -f -- "$service_tmp" "$timer_tmp"
+  if ! systemctl daemon-reload || ! systemctl enable --now ssh-one-udp-expiry.timer >/dev/null || ! systemctl is-active --quiet ssh-one-udp-expiry.timer; then
+    systemctl disable --now ssh-one-udp-expiry.timer >/dev/null 2>&1 || true
+    (( service_created )) && rm -f -- "$service"
+    (( timer_created )) && rm -f -- "$timer"
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    fail 'Could not start the UDP account expiry timer. No account was created.'
+    return 1
+  fi
+}
+
+save_udp_expiry() (
+  local username=$1 expires=$2 state=/etc/ssh-one/udp-expirations.tsv tmp
+  [[ ! -L $state ]] || { fail 'The UDP expiry state file is a symbolic link; it was not changed.'; return 1; }
+  [[ ! -e $state || -f $state ]] || { fail 'The UDP expiry state path is not a regular file.'; return 1; }
+  install -d -m 0755 /etc/ssh-one /run/lock || { fail 'Could not prepare the UDP expiry state directory.'; return 1; }
+  exec 9>/run/lock/ssh-one-udp-expiry.lock || { fail 'Could not lock the UDP expiry state.'; return 1; }
+  flock -x 9 || { fail 'Could not lock the UDP expiry state.'; return 1; }
+  tmp=$(mktemp /etc/ssh-one/.udp-expirations.XXXXXX) || { fail 'Could not stage the UDP expiry state.'; return 1; }
+  if [[ -f $state ]] && ! awk -F '\t' -v user="$username" '$1 != user { print }' "$state" > "$tmp"; then
+    rm -f -- "$tmp"
+    fail 'Could not prepare the UDP expiry record.'
+    return 1
+  fi
+  printf '%s\t%s\n' "$username" "$expires" >> "$tmp" || { rm -f -- "$tmp"; fail 'Could not save the UDP expiry record.'; return 1; }
+  chmod 0600 "$tmp" && mv -fT -- "$tmp" "$state" || { rm -f -- "$tmp"; fail 'Could not save the UDP expiry record.'; return 1; }
+)
+
+remove_udp_expiry() (
+  local username=$1 state=/etc/ssh-one/udp-expirations.tsv tmp
+  [[ -f $state && ! -L $state ]] || return 0
+  exec 9>/run/lock/ssh-one-udp-expiry.lock || return 1
+  flock -x 9 || return 1
+  tmp=$(mktemp /etc/ssh-one/.udp-expirations.XXXXXX) || return 1
+  if awk -F '\t' -v user="$username" '$1 != user { print }' "$state" > "$tmp" && chmod 0600 "$tmp" && mv -fT -- "$tmp" "$state"; then return 0; fi
+  rm -f -- "$tmp"
+  return 1
+)
+
 create_udp_user() {
-  local username password confirmation server_port
+  local username password server_port host server_ip created_epoch expires_epoch created_display expiry_display days
   [[ -x /root/udp/udp-custom ]] || { fail 'UDP Custom is not installed. Choose Install/repair UDP Custom first.'; pause; return 1; }
   printf 'Username (letters/numbers/._-; Linux limit is 32 characters): '
   read -r username || return 0
@@ -554,25 +655,27 @@ create_udp_user() {
   fi
   printf 'Password (any non-empty length; colon is not allowed): '
   IFS= read -r password || return 0
-  printf 'Confirm password: '
-  IFS= read -r confirmation || return 0
-  if [[ -z $password || $password == *:* || $password != "$confirmation" ]]; then
-    unset password confirmation
-    fail 'Passwords must match, must not be empty, and must not contain a colon.'
+  if [[ -z $password || $password == *:* ]]; then
+    unset password
+    fail 'Password must not be empty or contain a colon.'
     pause
     return 1
   fi
+  printf 'Expires in how many days? '
+  read -r days || { unset password; return 0; }
+  [[ $days =~ ^[0-9]{1,5}$ ]] && (( 10#$days >= 1 && 10#$days <= 36500 )) || { unset password; fail 'Enter a whole number from 1 to 36500 days.'; pause; return 1; }
+  ensure_udp_expiry_service || { unset password; pause; return 1; }
   if ! getent group "$udp_group" >/dev/null; then
-    groupadd --system "$udp_group" || { unset password confirmation; fail 'Could not create the UDP account group.'; pause; return 1; }
+    groupadd --system "$udp_group" || { unset password; fail 'Could not create the UDP account group.'; pause; return 1; }
   fi
   if ! useradd -M -s /bin/false -G "$udp_group" "$username"; then
-    unset password confirmation
+    unset password
     fail 'Could not create the system account.'
     pause
     return 1
   fi
   if ! printf '%s:%s\n' "$username" "$password" | chpasswd; then
-    unset password confirmation
+    unset password
     if userdel "$username" >/dev/null 2>&1; then
       fail 'Could not set the account password; the incomplete account was removed.'
     else
@@ -581,8 +684,29 @@ create_udp_user() {
     pause
     return 1
   fi
-  unset password confirmation
-  printf 'UDP Custom account created: %s\n' "$username"
+  created_epoch=$(date +%s)
+  created_display=$(date -d "@$created_epoch" '+%Y-%m-%d %H:%M:%S %Z')
+  expires_epoch=$(date -d "$(date -d "@$created_epoch" '+%Y-%m-%d %H:%M:%S') $((10#$days)) days" +%s) || expires_epoch=''
+  if [[ ! $expires_epoch =~ ^[0-9]{1,12}$ ]] || ! save_udp_expiry "$username" "$expires_epoch"; then
+    unset password
+    if userdel "$username" >/dev/null 2>&1; then fail 'Could not save the account expiry; the incomplete account was removed.'
+    else fail "Could not save the expiry or remove the incomplete account. Review and remove $username manually."; fi
+    pause
+    return 1
+  fi
+  expiry_display=$(date -d "@$expires_epoch" '+%Y-%m-%d %H:%M:%S %Z')
+  printf '\nUDP Custom account created\n'
+  printf '%-10s: %s\n' 'Username' "$username"
+  printf '%-10s: %s\n' 'Password' "$password"
+  printf '%-10s: %s\n' 'Created' "$created_display"
+  printf '%-10s: %s\n' 'Expires' "$expiry_display"
+  host='N/A'
+  if [[ -r /etc/ssh-one/host ]]; then IFS= read -r host < /etc/ssh-one/host || true
+  elif [[ -r /etc/xray/domain ]]; then IFS= read -r host < /etc/xray/domain || true; fi
+  printf '%-10s: %s\n' 'Host' "${host:-N/A}"
+  server_ip='N/A'
+  if [[ -r /etc/ssh-one/public-ip ]]; then IFS= read -r server_ip < /etc/ssh-one/public-ip || true; fi
+  printf '%-10s: %s\n' 'Server IP' "${server_ip:-N/A}"
   server_port=$(python3 - /root/udp/config.json <<'PY'
 import json, re, sys
 try:
@@ -596,26 +720,32 @@ except Exception:
     print('unknown')
 PY
   )
-  printf 'Use this username/password with a client that supports UDP Custom. Current server listener: UDP %s.\n' "$server_port"
-  pause
+  printf '%-10s: UDP %s\n' 'Listener' "$server_port"
+  printf 'Expiry cleanup runs every 15 seconds.\n'
+  command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created udp || true
+  exit 0
 }
 
 list_udp_users() {
-  local members username
-  if ! getent group "$udp_group" >/dev/null; then
-    printf 'No SSH-one UDP Custom accounts have been created from this menu.\n'
-    pause
-    return 0
-  fi
-  members=$(getent group "$udp_group" | awk -F: '{print $4}')
-  if [[ -z $members ]]; then
-    printf 'No SSH-one UDP Custom accounts have been created from this menu.\n'
-  else
-    printf '\nUDP Custom accounts managed by this menu:\n'
-    IFS=',' read -r -a user_list <<<"$members"
-    for username in "${user_list[@]}"; do printf '  %s\n' "$username"; done
-  fi
+  local username expires expiration
+  local -a users=()
+  if command -v ssh-one-account-tools >/dev/null 2>&1; then mapfile -t users < <(ssh-one-account-tools list-udp)
+  else printf 'Account inventory helper is missing. Update SSH-one first.\n'; return 1; fi
+  if (( ${#users[@]} == 0 )); then printf 'No UDP accounts.\n'; return 0; fi
+  printf '\nUDP accounts (%s):\n' "${#users[@]}"
+  for username in "${users[@]}"; do
+    expires=$(awk -F '\t' -v user="$username" '$1 == user {print $2; exit}' /etc/ssh-one/udp-expirations.tsv 2>/dev/null || true)
+    if [[ $expires =~ ^[0-9]{1,12}$ ]]; then expiration=$(date -d "@$expires" '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null || printf 'invalid')
+    else expiration='not tracked'; fi
+    printf '  %-24s %s\n' "$username" "$expiration"
+  done
   pause
+}
+
+list_online_udp_users() {
+  printf 'UDP Custom does not expose per-user live session data, so active UDP usernames cannot be listed.\n'
+  if systemctl is-active --quiet udp-custom.service; then printf 'UDP Custom service: active\n'
+  else printf 'UDP Custom service: inactive\n'; fi
 }
 
 delete_udp_user() {
@@ -632,6 +762,7 @@ delete_udp_user() {
   [[ ${answer,,} == y || ${answer,,} == yes ]] || return 0
   pkill -KILL -u "$username" 2>/dev/null || true
   if userdel "$username"; then
+    if ! remove_udp_expiry "$username"; then fail 'Account was deleted; its stale expiry record will be removed by the next expiry check.'; fi
     printf 'Account deleted: %s\n' "$username"
   else
     fail "Could not delete account: $username"
@@ -659,15 +790,16 @@ while true; do
   if (( first_menu_iteration )) && [[ -t 1 ]] && command -v clear >/dev/null 2>&1; then clear 2>/dev/null || true; fi
   first_menu_iteration=0
   printf '%s\n' '================ SSH-one UDP & Port Menu ================'
-  printf '%s\n' '1. Open port(s) in host firewall (default UDP 1-65535; customizable)'
-  printf '%s\n' '2. Change UDP Custom listener port (default 36712)'
-  printf '%s\n' '3. Configure excluded UDP ports (defaults: 500, 1701, 2200, 4500, 7070)'
-  printf '%s\n' '4. Check UDP Custom service status'
+  printf '%s\n' '1. Open firewall ports'
+  printf '%s\n' '2. Change UDP listener port'
+  printf '%s\n' '3. Set excluded UDP ports'
+  printf '%s\n' '4. Check service and accounts'
   printf '%s\n' '5. Install/repair UDP Custom'
-  printf '%s\n' '6. Create UDP Custom account'
-  printf '%s\n' '7. List UDP Custom accounts'
-  printf '%s\n' '8. Delete UDP Custom account'
-  printf '%s\n' '9. Restart UDP Custom service'
+  printf '%s\n' '6. Create UDP account'
+  printf '%s\n' '7. All UDP users'
+  printf '%s\n' '8. Online UDP users'
+  printf '%s\n' '9. Delete UDP account'
+  printf '%s\n' '10. Restart UDP service'
   printf '%s\n' '0. Back to main menu'
   printf '%s\n' '=========================================================='
   read -r -p 'Select an option: ' choice || exit 0
@@ -679,8 +811,9 @@ while true; do
     5) install_udp || true ;;
     6) create_udp_user || true ;;
     7) list_udp_users ;;
-    8) delete_udp_user || true ;;
-    9) restart_udp || true ;;
+    8) list_online_udp_users ;;
+    9) delete_udp_user || true ;;
+    10) restart_udp || true ;;
     0) exit 0 ;;
     *) fail 'Invalid option.'; pause ;;
   esac

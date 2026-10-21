@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Keep optional statistics tools from delaying or hiding the menu.
-MENU_VERSION='v24'
+MENU_VERSION='v25'
 if [[ -r /etc/ssh-one/installation-complete ]]; then
   installed_menu_version=''
   IFS= read -r installed_menu_version < /etc/ssh-one/installation-complete || true
@@ -20,7 +20,7 @@ if [[ ${1:-} == --check ]]; then
 fi
 
 # Older installed updaters do not save the source commit. Resolve it once on
-# the first v24 menu launch, then use the local value on subsequent launches.
+# the first menu launch, then use the local value on subsequent launches.
 if [[ $MENU_REFERENCE == "$MENU_VERSION" && -r /etc/ssh-one/repository.conf ]] &&
    command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
   source_owner=$(sed -n "s/^SSH_ONE_OWNER='\\([^']*\\)'$/\\1/p" /etc/ssh-one/repository.conf)
@@ -69,6 +69,18 @@ count_matches() {
   if [[ -r $file ]]; then
     count=$(grep -cE "$pattern" "$file" 2>/dev/null) || count=0
     printf '%s' "$count"
+  else
+    printf '0'
+  fi
+}
+
+count_unique_users() {
+  local marker=$1 file
+  shift
+  local -a readable_files=()
+  for file in "$@"; do [[ -r $file ]] && readable_files+=("$file"); done
+  if ((${#readable_files[@]})); then
+    awk -v marker="$marker" 'index($0, marker) == 1 { user=$2; if (user != "") users[user]=1 } END { for (user in users) count++; print count+0 }' "${readable_files[@]}" 2>/dev/null
   else
     printf '0'
   fi
@@ -135,14 +147,16 @@ bandwidth_summary() {
 
 server_summary() {
   local os='Linux' uptime='N/A' cores='N/A' cpu='N/A' ram='N/A' domain='N/A' dnstt='N/A' public_ip='N/A'
-  local ssh_accounts udp_accounts
+  local ssh_accounts udp_accounts vmess_accounts vless_accounts
   if [[ -r /etc/os-release ]]; then
     os=$( . /etc/os-release; printf '%s' "${PRETTY_NAME:-Linux}" ) 2>/dev/null || os='Linux'
   fi
   command -v uptime >/dev/null 2>&1 && uptime=$(uptime -p 2>/dev/null | sed 's/^up //') || true
   command -v getconf >/dev/null 2>&1 && cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null) || true
   cpu=$(cpu_usage)
-  command -v free >/dev/null 2>&1 && ram=$(free -m 2>/dev/null | awk 'NR==2 {printf "%s/%s", $3, $2}') || true
+  if [[ -r /proc/meminfo ]]; then
+    ram=$(awk '/^MemTotal:/ {total=$2} /^MemAvailable:/ {available=$2} END {if (total > 0 && available >= 0) printf "%d/%d", (total-available)/1024, total/1024}' /proc/meminfo 2>/dev/null) || ram=''
+  fi
   [[ -n $ram ]] || ram='N/A'
   domain=$(read_value /etc/xray/domain)
   [[ $domain != N/A ]] || domain=$(read_value /etc/ssh-one/host)
@@ -152,8 +166,14 @@ server_summary() {
     public_ip=$(timeout 2 getent ahostsv4 "$domain" 2>/dev/null | awk 'NR == 1 {print $1}')
     [[ -n $public_ip ]] || public_ip='N/A'
   fi
-  ssh_accounts=$(awk -F: '$3 >= 1000 && $1 != "nobody" && $7 !~ /(nologin|false)$/ {n++} END {print n+0}' /etc/passwd 2>/dev/null)
-  udp_accounts=$(getent group ssh-one-udp 2>/dev/null | awk -F: '$1 == "ssh-one-udp" {if ($4 == "") print 0; else {n=split($4, members, ","); print n}; found=1} END {if (!found) print 0}')
+  ssh_accounts=0
+  udp_accounts=0
+  if command -v ssh-one-account-tools >/dev/null 2>&1; then
+    ssh_accounts=$(ssh-one-account-tools count 2>/dev/null) || ssh_accounts=0
+    udp_accounts=$(ssh-one-account-tools count-udp 2>/dev/null) || udp_accounts=0
+  fi
+  vmess_accounts=$(count_unique_users '### ' /etc/xray/config.json /etc/xray/sl-vmessgrpc.json)
+  vless_accounts=$(count_unique_users '#### ' /etc/xray/config.json /etc/xray/sl-vlessgrpc.json)
   printf '%s\n' "${cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}"
   printf '%s♦️ Server Information ♦️%s\n' "$white" "$reset"
   printf '%s♦️ OS       : %s%s\n' "$white" "${os:-Linux}" "$reset"
@@ -171,10 +191,10 @@ server_summary() {
   printf '%s♦️ Accounts ♦️%s\n' "$white" "$reset"
   printf '%-6s %-7s %-8s %-7s %-8s %-9s\n' 'UDP' 'SSH' 'VMESS' 'VLESS' 'TROJAN' 'TROJANGO'
   printf '%-6s %-7s %-8s %-7s %-8s %-9s\n' "$udp_accounts" "${ssh_accounts:-0}" \
-    "$(count_matches '^### ' /etc/xray/config.json)" \
-    "$(count_matches '^#### ' /etc/xray/config.json)" \
-    "$(count_matches '^#&# ' /etc/xray/config.json)" \
-    "$(count_matches '^### ' /etc/trojan-go/akun.conf)"
+    "$vmess_accounts" \
+    "$vless_accounts" \
+    "$(count_unique_users '#&# ' /etc/xray/config.json)" \
+    "$(count_unique_users '### ' /etc/trojan-go/akun.conf)"
   printf '%s\n' "$reset"
 }
 
@@ -238,13 +258,20 @@ show_menu() {
 }
 
 run_action() {
-  local command_name=$1
+  local command_name=$1 status marker=/run/ssh-one/account-created show_after=0
   shift
   if ! command -v "$command_name" >/dev/null 2>&1; then
     printf 'Menu item unavailable: command "%s" is not installed.\n' "$command_name" >&2
     return 127
   fi
-  "$command_name" "$@"
+  rm -f -- "$marker" 2>/dev/null || true
+  if SSH_ONE_MENU_ACTIVE=1 "$command_name" "$@"; then status=0; else status=$?; fi
+  if [[ -s $marker ]]; then
+    rm -f -- "$marker"
+    [[ -r /etc/ssh-one/menu-after-create ]] && IFS= read -r show_after < /etc/ssh-one/menu-after-create || true
+    [[ $show_after == 1 ]] || exit 0
+  fi
+  return "$status"
 }
 
 first_menu_iteration=1

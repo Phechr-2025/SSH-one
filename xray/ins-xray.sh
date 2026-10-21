@@ -86,14 +86,6 @@ if ! "$acme_bin" --install-cert -d "$domain" --fullchain-file /etc/xray/xray.crt
 	exit 1
 fi
 [[ -s /etc/xray/xray.crt && -s /etc/xray/xray.key ]] || { echo "The TLS certificate or key is missing after issuance." >&2; exit 1; }
-uuid7=$(cat /proc/sys/kernel/random/uuid)
-uuid1=$(cat /proc/sys/kernel/random/uuid)
-uuid2=$(cat /proc/sys/kernel/random/uuid)
-uuid3=$(cat /proc/sys/kernel/random/uuid)
-uuid4=$(cat /proc/sys/kernel/random/uuid)
-uuid5=$(cat /proc/sys/kernel/random/uuid)
-uuid6=$(cat /proc/sys/kernel/random/uuid)
-
 # // Certificate File
 path_crt="/etc/xray/xray.crt"
 path_key="/etc/xray/xray.key"
@@ -112,11 +104,7 @@ cat > /etc/xray/config.json << END
       "protocol": "vmess",
       "settings": {
         "clients": [
-          {
-            "id": "${uuid1}",
-            "alterId": 0
 #xray-vmess-tls
-          }
         ]
       },
       "streamSettings": {
@@ -147,12 +135,7 @@ cat > /etc/xray/config.json << END
       "protocol": "vmess",
       "settings": {
         "clients": [
-
-          {
-            "id": "${uuid2}",
-            "alterId": 0
 #xray-vmess-nontls
-          }
         ]
       },
       "streamSettings": {
@@ -183,10 +166,7 @@ cat > /etc/xray/config.json << END
       "protocol": "vless",
       "settings": {
         "clients": [
-          {
-            "id": "${uuid3}"
 #xray-vless-tls
-          }
         ],
         "decryption": "none"
       },
@@ -226,10 +206,7 @@ cat > /etc/xray/config.json << END
       "protocol": "vless",
       "settings": {
         "clients": [
-          {
-            "id": "${uuid4}"
 #xray-vless-nontls
-          }
         ],
         "decryption": "none"
       },
@@ -261,10 +238,7 @@ cat > /etc/xray/config.json << END
       "protocol": "trojan",
       "settings": {
         "clients": [
-          {
-            "password": "${uuid5}"
 #xray-trojan
-          }
         ],
         "fallbacks": [
           {
@@ -445,9 +419,7 @@ cat > /etc/trojan-go/config.json << END
   "remote_port": 89,
   "log_level": 1,
   "log_file": "/var/log/trojan-go/trojan-go.log",
-  "password": [
-      "$uuid"
-  ],
+  "password": [],
   "disable_http_check": true,
   "udp_timeout": 60,
   "ssl": {
@@ -518,11 +490,6 @@ RestartPreventExitStatus=23
 
 [Install]
 WantedBy=multi-user.target
-END
-
-# Trojan Go Uuid
-cat > /etc/trojan-go/uuid.txt << END
-$uuid
 END
 
 # restart

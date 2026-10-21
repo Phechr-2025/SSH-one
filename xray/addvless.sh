@@ -38,7 +38,7 @@ tls="$(cat ~/log-install.txt | grep -w "Vless TLS" | cut -d: -f2|sed 's/ //g')"
 nontls="$(cat ~/log-install.txt | grep -w "Vless None TLS" | cut -d: -f2|sed 's/ //g')"
 until [[ $user =~ ^[a-zA-Z0-9_]+$ && ${CLIENT_EXISTS} == '0' ]]; do
 		read -rp "Username : " -e user
-		CLIENT_EXISTS=$(grep -w $user /etc/xray/config.json | wc -l)
+		CLIENT_EXISTS=$(awk -v name="$user" '$1 == "####" && $2 == name {found=1} END {print found+0}' /etc/xray/config.json)
 
 		if [[ ${CLIENT_EXISTS} == '1' ]]; then
 			echo ""
@@ -50,10 +50,19 @@ uuid=$(cat /proc/sys/kernel/random/uuid)
 read -p "Expired (Days) : " masaaktif
 hariini=`date -d "0 days" +"%Y-%m-%d"`
 exp=`date -d "$masaaktif days" +"%Y-%m-%d"`
-sed -i '/#xray-vless-tls$/a\#### '"$user $exp"'\
+if command -v ssh-one-xray-accounts >/dev/null 2>&1; then
+	ssh-one-xray-accounts add /etc/xray/config.json '#xray-vless-tls' vless "$user" "$exp" "$uuid" || exit 1
+	ssh-one-xray-accounts add /etc/xray/config.json '#xray-vless-nontls' vless "$user" "$exp" "$uuid" || exit 1
+else
+	if ! grep -Eq '^#### ' /etc/xray/config.json; then
+		echo "Xray account helper is missing; refusing to modify the empty client configuration." >&2
+		exit 1
+	fi
+	sed -i '/#xray-vless-tls$/a\#### '"$user $exp"'\
 },{"id": "'""$uuid""'","email": "'""$user""'"' /etc/xray/config.json
-sed -i '/#xray-vless-nontls$/a\#### '"$user $exp"'\
+	sed -i '/#xray-vless-nontls$/a\#### '"$user $exp"'\
 },{"id": "'""$uuid""'","email": "'""$user""'"' /etc/xray/config.json
+fi
 xrayvless1="vless://${uuid}@${domain}:$tls?type=ws&encryption=none&security=tls&host=${domain}&path=/vless&allowInsecure=1&sni=${sni}#XRAY_VLESS_${user}"
 xrayvless2="vless://${uuid}@${domain}:$nontls?type=ws&encryption=none&security=none&host=${domain}&path=/vless#XRAY_VLESS_${user}"
 systemctl restart xray.service
@@ -113,3 +122,4 @@ echo -e "========================="
 echo -e "Link No TLS : ${xrayvless2}"
 echo -e "========================="
 echo -e "Script Mod"
+command -v ssh-one-account-tools >/dev/null 2>&1 && ssh-one-account-tools mark-created vless || true

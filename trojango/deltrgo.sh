@@ -45,8 +45,19 @@ NUMBER_OF_CLIENTS=$(grep -c -E "^### " "/etc/trojan-go/akun.conf")
 CLIENT_NAME=$(grep -E "^### " "/etc/trojan-go/akun.conf" | cut -d ' ' -f 2-3 | sed -n "${CLIENT_NUMBER}"p)
 user=$(grep -E "^### " "/etc/trojan-go/akun.conf" | cut -d ' ' -f 2 | sed -n "${CLIENT_NUMBER}"p)
 exp=$(grep -E "^### " "/etc/trojan-go/akun.conf" | cut -d ' ' -f 3 | sed -n "${CLIENT_NUMBER}"p)
-sed -i "/^### $user $exp/d" /etc/trojan-go/akun.conf
-sed -i '/^,"'"$user"'"$/d' /etc/trojan-go/config.json
+if ! jq -e '.password | type == "array"' /etc/trojan-go/config.json >/dev/null; then
+	echo "Trojan-Go password list is missing or invalid; account data was not changed." >&2
+	exit 1
+fi
+trojan_config_tmp=$(mktemp /etc/trojan-go/.config.json.XXXXXX) || { echo "Could not stage the Trojan-Go config." >&2; exit 1; }
+if ! jq --arg user "$user" '.password |= map(select(. != $user))' /etc/trojan-go/config.json > "$trojan_config_tmp"; then
+	rm -f -- "$trojan_config_tmp"
+	echo "Could not update the Trojan-Go password list." >&2
+	exit 1
+fi
+chmod --reference=/etc/trojan-go/config.json "$trojan_config_tmp"
+mv -fT -- "$trojan_config_tmp" /etc/trojan-go/config.json || { rm -f -- "$trojan_config_tmp"; echo "Could not activate the Trojan-Go config." >&2; exit 1; }
+sed -i "/^### $user $exp\$/d" /etc/trojan-go/akun.conf
 systemctl restart trojan-go.service
 service cron restart
 clear

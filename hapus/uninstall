@@ -30,6 +30,8 @@ preserved=0
 
 units=(
   'udp-custom.service|/root/udp/udp-custom'
+  'ssh-one-udp-expiry.service|ExecStart=/usr/bin/ssh-one-udp-expiry'
+  'ssh-one-udp-expiry.timer|Unit=ssh-one-udp-expiry.service'
   'udpgw.service|/bin/udpgw'
   'ws-tls.service|/usr/local/bin/ws-tls'
   'ws-nontls.service|/usr/local/bin/ws-nontls'
@@ -59,7 +61,7 @@ for entry in "${units[@]}"; do
     fi
   fi
   systemctl disable "$unit" >/dev/null 2>&1 || note "could not disable $unit, but it is stopped."
-  rm -f -- "$unit_file" "/etc/systemd/system/multi-user.target.wants/$unit"
+  rm -f -- "$unit_file" "/etc/systemd/system/multi-user.target.wants/$unit" "/etc/systemd/system/timers.target.wants/$unit"
   note "removed verified unit $unit."
 done
 if ! systemctl daemon-reload; then
