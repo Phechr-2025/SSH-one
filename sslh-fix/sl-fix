@@ -39,9 +39,10 @@ cat > /etc/rc.local <<-END
 # By default this script does nothing.
 
 sslh-fix-reboot
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7100 --max-clients 500
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7200 --max-clients 500
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 500
+/usr/bin/ssh-one-game-network apply || {
+  echo "Could not start the separate BadVPN UDPGW listeners." >&2
+  exit 1
+}
 iptables -I INPUT -p udp --dport 5300 -j ACCEPT
 iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
 exit 0

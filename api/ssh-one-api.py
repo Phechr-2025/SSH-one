@@ -610,7 +610,7 @@ def system_info():
             "memory_mb":{"total":round(memory.get("MemTotal",0)/1024),"available":round(memory.get("MemAvailable",0)/1024)},
             "host":host_name() or None,"api_bind":HOST,"api_port":PORT,
             "supported_services":list(SERVICES),
-            "ports":{"ssh_tcp":[22,2253],"udp_custom_range":[1,65535],"udp_custom_listener":udp_listener(),
+            "ports":{"ssh_tcp":[22,2253,42],"udp_custom_range":[1,65535],"udp_custom_listener":udp_listener(),
                      "vmess_tls":port("Vmess TLS",8443),"vmess_plain":port("Vmess None TLS",80),
                      "vless_tls":port("Vless TLS",8444),"vless_plain":port("Vless None TLS",81),
                      "trojan":port("Trojan",2083)}}
@@ -643,7 +643,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             path=urllib.parse.unquote(parsed.path)
             if not path.startswith(PREFIX): raise ApiError(404,"route not found")
             parts=path[len(PREFIX):].strip("/").split("/") if path[len(PREFIX):].strip("/") else []
-            if self.command=="GET" and parts==["health"]: status,result=200,{"ok":True,"version":"v27"}
+            if self.command=="GET" and parts==["health"]: status,result=200,{"ok":True,"version":"v28"}
             elif self.command=="GET" and parts==["system"]: status,result=200,system_info()
             elif parts and parts[0]=="accounts" and self.command=="GET" and len(parts)==1:
                 service=urllib.parse.parse_qs(parsed.query).get("service",[None])[0]

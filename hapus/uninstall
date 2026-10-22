@@ -24,6 +24,10 @@ flock -n 9 || fail 'an update is running; retry after it finishes.'
 exec 7>/run/lock/ssh-one-uninstall.lock || fail 'could not create the uninstall lock.'
 flock -n 7 || fail 'another SSH-one uninstall is already running.'
 
+if command -v ssh-one-game-network >/dev/null 2>&1; then
+  ssh-one-game-network remove || fail 'could not stop and remove verified BadVPN listeners; no service files were deleted.'
+fi
+
 if [[ -f /etc/wireguard/wg0.conf && ! -L /etc/wireguard/wg0.conf ]]; then
   if systemctl is-active --quiet wg-quick@wg0.service; then
     systemctl stop wg-quick@wg0.service >/dev/null 2>&1 || fail 'WireGuard is still running; no uninstall files were removed. Inspect systemctl status wg-quick@wg0 and retry.'

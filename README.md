@@ -6,7 +6,7 @@
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
 </div>
 
-**Release: SSH-one 2.0 v1**
+**Release: SSH-one 2.0 v2**
 
 ## Install
 
@@ -43,7 +43,7 @@ For a step-by-step Thai walkthrough, see the [Thai installation guide](docs/inst
 - Option **26** uninstalls SSH-one. Review the summary, back up data, and type <code>UNINSTALL</code> to confirm.
 - Option **27** creates, lists, and deletes API tokens. The default token lifetime is 30 days.
 
-Updates replace files listed in the managed manifest and apply the supported BadVPN/WireGuard game-network migration. They do not update OS packages, other service configuration/accounts, or separately downloaded upstream binaries. Uninstall removes some service data; it retains OpenSSH, OS packages, unlabelled firewall rules, and files modified after installation.
+SSH transport and UDP gateway behavior now use the original layout: OpenSSH uses TCP ports 22, 2253, and 42, and BadVPN runs one listener process for each loopback port. Updates migrate the previous combined BadVPN service and replace files in the managed manifest. They do not update OS packages, other service configuration/accounts, or unrelated binaries. Uninstall removes some service data; it retains OpenSSH, OS packages, unlabelled firewall rules, and files modified after installation.
 
 ## Services and default ports
 
@@ -51,12 +51,12 @@ Open required ports in both the VPS firewall and the provider firewall/security 
 
 | Service | Port/protocol |
 | --- | --- |
-| OpenSSH | TCP 22, 2253 |
+| OpenSSH | TCP 22, 2253, 42 |
 | Dropbear | TCP 109, 143, 1153 |
 | OpenVPN | TCP 1194, UDP 2200, TLS/TCP 990 |
 | SSLH / SSH WebSocket | TCP 443 (TLS multiplex), HTTP 8880 |
 | Stunnel5 | TCP 445, 777, 990 |
-| BadVPN UDPGW | TCP 7100, 7200, 7300 (loopback; compatible SSH apps) |
+| BadVPN UDPGW | TCP 7100, 7200, 7300 (separate loopback listeners; compatible SSH apps) |
 | WireGuard | UDP 7070 |
 | L2TP/IPsec, PPTP | UDP 500, 1701, 4500; TCP 1732 |
 | SSTP | TCP 444 |

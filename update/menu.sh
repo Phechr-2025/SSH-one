@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Keep optional statistics tools from delaying or hiding the menu.
-MENU_VERSION='v27'
+MENU_VERSION='v28'
 if [[ -r /etc/ssh-one/installation-complete ]]; then
   installed_menu_version=''
   IFS= read -r installed_menu_version < /etc/ssh-one/installation-complete || true
@@ -204,12 +204,12 @@ show_service_ports() {
   printf '%s♦️ Service Ports ♦️%s\n' "$white" "$reset"
   printf '%s\n' "$cyan$line$reset"
   printf '%-30s %s\n' 'Service' 'Port / Protocol'
-  printf '%-30s %s\n' 'OpenSSH' 'TCP 22, 2253'
+  printf '%-30s %s\n' 'OpenSSH' 'TCP 22, 2253, 42'
   printf '%-30s %s\n' 'Dropbear' 'TCP 109, 143, 1153'
   printf '%-30s %s\n' 'OpenVPN' 'TCP 1194, UDP 2200, TLS/TCP 990'
   printf '%-30s %s\n' 'SSLH / SSH WebSocket' 'TCP 443 (TLS multiplex), HTTP 8880'
   printf '%-30s %s\n' 'Stunnel5' 'TCP 445, 777, 990'
-  printf '%-30s %s\n' 'BadVPN UDPGW' 'Loopback TCP 7100, 7200, 7300 (SSH apps)'
+  printf '%-30s %s\n' 'BadVPN UDPGW' 'Separate loopback TCP 7100, 7200, 7300 (SSH apps)'
   printf '%-30s %s\n' 'WireGuard' 'UDP 7070 (IPv4 game tunnel)'
   printf '%-30s %s\n' 'L2TP/IPsec, PPTP' 'UDP 500, 1701, 4500; TCP 1732'
   printf '%-30s %s\n' 'SSTP' 'TCP 444'

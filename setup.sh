@@ -63,7 +63,7 @@ if ! install -d -m 0755 /etc/ssh-one; then
 	report_error "Could not create the SSH-one state directory."
 	exit 1
 fi
-if ! printf 'v27 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
+if ! printf 'v28 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
 	report_error "Could not write the installation-in-progress marker."
 	exit 1
 fi
@@ -244,7 +244,7 @@ echo "" | tee -a /root/log-install.txt
 echo "----------------------------------------------------------------------------" | tee -a /root/log-install.txt
 echo ""  | tee -a /root/log-install.txt
 echo "   >>> Service & Port"  | tee -a /root/log-install.txt
-echo "   - OpenSSH                 : 22, 2253"  | tee -a /root/log-install.txt
+echo "   - OpenSSH                 : TCP 22, 2253, 42"  | tee -a /root/log-install.txt
 echo "   - OpenVPN                 : TCP 1194, UDP 2200, TLS/TCP 990"  | tee -a /root/log-install.txt
 echo "   - SSLH / SSH Websocket    : TCP 443 (TLS multiplex), HTTP 8880"  | tee -a /root/log-install.txt
 echo "   - Stunnel5                : TCP 445, 777, 990"  | tee -a /root/log-install.txt
@@ -255,7 +255,7 @@ echo "   - SSH Websocket HTTP      : 8880"  | tee -a /root/log-install.txt
 echo "   - Websocket OpenVPN       : 2086"  | tee -a /root/log-install.txt
 echo "   - BadVPN UDPGW            : loopback TCP 7100, 7200, 7300 (compatible SSH apps)"  | tee -a /root/log-install.txt
 echo "   - Nginx                   : 89"  | tee -a /root/log-install.txt
-echo "   - WireGuard Game Tunnel   : UDP 7070 (IPv4 full tunnel)"  | tee -a /root/log-install.txt
+echo "   - WireGuard               : UDP 7070 (full-tunnel profile)"  | tee -a /root/log-install.txt
 echo "   - L2TP/IPsec              : UDP 500, 1701, 4500"  | tee -a /root/log-install.txt
 echo "   - PPTP VPN                : 1732"  | tee -a /root/log-install.txt
 echo "   - SSTP VPN                : 444"  | tee -a /root/log-install.txt
@@ -309,19 +309,19 @@ verify_ssh_access() {
 		report_error "Could not read effective OpenSSH settings; VPS will not be rebooted."
 		return 1
 	}
-	for setting in 'permitrootlogin yes' 'passwordauthentication yes' 'pubkeyauthentication yes' 'port 22' 'port 2253'; do
+	for setting in 'permitrootlogin yes' 'passwordauthentication yes' 'pubkeyauthentication yes' 'port 22' 'port 2253' 'port 42'; do
 		if ! printf '%s\n' "$effective" | grep -Fxq "$setting"; then
 			report_error "Required OpenSSH setting is not active: $setting. VPS will not be rebooted."
 			return 1
 		fi
 	done
-	for port in 22 2253; do
+	for port in 22 2253 42; do
 		if ! ss -H -ltn | awk -v p="$port" '$4 ~ (":" p "$") && $4 !~ /^127\.0\.0\.1:/ && $4 !~ /^\[::1\]:/ && $4 !~ /^::1:/ { found=1 } END { exit !found }'; then
 			report_error "OpenSSH is not listening on public-capable TCP port $port. VPS will not be rebooted."
 			return 1
 		fi
 	done
-	for port in 22 2253; do
+	for port in 22 2253 42; do
 		if ! iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null; then
 			report_error "Host firewall is not allowing TCP port $port. VPS will not be rebooted."
 			return 1
@@ -346,10 +346,10 @@ if [[ ! $source_commit =~ ^[a-f0-9]{40}$ ]]; then source_commit='unknown'; fi
 printf '%s\n' "$source_commit" > /etc/ssh-one/.source-commit.new || { report_error "Could not prepare the GitHub source reference."; exit 1; }
 chmod 0644 /etc/ssh-one/.source-commit.new || { report_error "Could not set permissions on the GitHub source reference."; exit 1; }
 mv -fT -- /etc/ssh-one/.source-commit.new /etc/ssh-one/source-commit || { report_error "Could not activate the GitHub source reference."; exit 1; }
-printf 'v27\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
+printf 'v28\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
 mv -fT -- /etc/ssh-one/.installation-complete.new /etc/ssh-one/installation-complete || { report_error "Could not activate the installation marker."; exit 1; }
 rm -f /etc/ssh-one/install-in-progress || { report_error "Could not remove the installation-in-progress marker."; exit 1; }
-printf 'Installation complete. SSH config and TCP 22/2253 listeners passed checks. VPS will reboot in 10 seconds.\n' | tee -a /root/log-install.txt
+printf 'Installation complete. SSH config and TCP 22/2253/42 listeners passed checks. VPS will reboot in 10 seconds.\n' | tee -a /root/log-install.txt
 for remaining in {10..1}; do
 	printf '\rRestarting VPS in %2d seconds...' "$remaining"
 	sleep 1

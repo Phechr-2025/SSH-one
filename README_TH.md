@@ -6,7 +6,7 @@
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
 </div>
 
-**รุ่น: SSH-one 2.0 v1**
+**รุ่น: SSH-one 2.0 v2**
 
 ## ติดตั้ง
 
@@ -43,7 +43,7 @@ bash ssh-one-install.sh Phechr-2025 SSH-one main
 - เมนูข้อ **26** ถอนการติดตั้ง; อ่านสรุปและสำรองข้อมูลก่อนพิมพ์ <code>UNINSTALL</code>
 - เมนูข้อ **27** สร้าง ดู และลบ API token; ค่าเริ่มต้นหมดอายุใน 30 วัน
 
-การอัปเดตเปลี่ยนไฟล์ใน manifest และปรับบริการ BadVPN/WireGuard สำหรับการใช้งานเครือข่ายตามรุ่นนี้ ไม่อัปเดตแพ็กเกจระบบ, config/บัญชีบริการอื่น หรือไบนารีจาก upstream โดยอัตโนมัติ การถอนจะลบข้อมูลบริการบางส่วน; เก็บ OpenSSH, แพ็กเกจระบบ, กฎ firewall ที่ไม่ได้ระบุว่าเป็นของ SSH-one และไฟล์ที่ถูกแก้ไขภายหลังไว้
+การเชื่อมต่อ SSH และ UDP gateway กลับมาใช้รูปแบบเดิม: OpenSSH ใช้ TCP 22, 2253 และ 42 ส่วน BadVPN แยก process ตาม listener แต่ละพอร์ต การอัปเดตย้ายบริการ BadVPN แบบเดิมและแทนไฟล์ใน manifest แต่ไม่อัปเดตแพ็กเกจระบบ, config/บัญชีบริการอื่น หรือไบนารีที่ไม่ได้จัดการ การถอนจะลบข้อมูลบริการบางส่วน; เก็บ OpenSSH, แพ็กเกจระบบ, กฎ firewall ที่ไม่ได้ระบุว่าเป็นของ SSH-one และไฟล์ที่ถูกแก้ไขภายหลังไว้
 
 ## บริการและพอร์ตเริ่มต้น
 
@@ -51,12 +51,12 @@ bash ssh-one-install.sh Phechr-2025 SSH-one main
 
 | บริการ | พอร์ต/โปรโตคอล |
 | --- | --- |
-| OpenSSH | TCP 22, 2253 |
+| OpenSSH | TCP 22, 2253, 42 |
 | Dropbear | TCP 109, 143, 1153 |
 | OpenVPN | TCP 1194, UDP 2200, TLS/TCP 990 |
 | SSLH / SSH WebSocket | TCP 443 (TLS multiplex), HTTP 8880 |
 | Stunnel5 | TCP 445, 777, 990 |
-| BadVPN UDPGW | TCP 7100, 7200, 7300 (loopback; SSH app ที่รองรับ) |
+| BadVPN UDPGW | TCP 7100, 7200, 7300 (แยก listener ที่ loopback; SSH app ที่รองรับ) |
 | WireGuard | UDP 7070 |
 | L2TP/IPsec, PPTP | UDP 500, 1701, 4500; TCP 1732 |
 | SSTP | TCP 444 |

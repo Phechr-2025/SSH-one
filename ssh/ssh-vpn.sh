@@ -186,6 +186,7 @@ configure_ssh_access() {
 # BEGIN SSH-one managed access settings
 Port 22
 Port 2253
+Port 42
 PermitRootLogin yes
 PasswordAuthentication yes
 PubkeyAuthentication yes
@@ -217,14 +218,14 @@ SSH_ONE_ACCESS
 		cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
 		return 1
 	}
-	for setting in 'permitrootlogin yes' 'passwordauthentication yes' 'pubkeyauthentication yes' 'port 22' 'port 2253'; do
+	for setting in 'permitrootlogin yes' 'passwordauthentication yes' 'pubkeyauthentication yes' 'port 22' 'port 2253' 'port 42'; do
 		if ! printf '%s\n' "$effective" | grep -Fxq "$setting"; then
 			echo "Required OpenSSH setting is not active: $setting" >&2
 			cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
 			return 1
 		fi
 	done
-	for port in 22 2253; do
+	for port in 22 2253 42; do
 		if ! iptables -w -I INPUT 1 -p tcp --dport "$port" -j ACCEPT; then
 			echo "Could not add the host firewall allow rule for TCP port $port." >&2
 			cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
@@ -243,7 +244,7 @@ SSH_ONE_ACCESS
 		cp -a "$backup" "$config" && systemctl restart ssh >/dev/null 2>&1 || true
 		return 1
 	fi
-	for port in 22 2253; do
+	for port in 22 2253 42; do
 		# Ignore loopback-only listeners; those cannot accept internet connections.
 		if ! ss -H -ltn | awk -v p="$port" '$4 ~ (":" p "$") && $4 !~ /^127\.0\.0\.1:/ && $4 !~ /^\[::1\]:/ && $4 !~ /^::1:/ { found=1 } END { exit !found }'; then
 			echo "OpenSSH is not listening on TCP port $port on a non-loopback address." >&2
@@ -251,7 +252,7 @@ SSH_ONE_ACCESS
 			return 1
 		fi
 	done
-	echo "OpenSSH is active with root/password and key authentication on TCP 22 and 2253."
+	echo "OpenSSH is active with root/password and key authentication on TCP 22, 2253, and 42."
 }
 if ! configure_ssh_access; then
 	echo "SSH setup failed; stopping installation to avoid a reboot with broken access." >&2

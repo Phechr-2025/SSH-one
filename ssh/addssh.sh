@@ -75,7 +75,7 @@ Expired: $expi
 IP/Host: $IP
 Domain SSH: $domain
 =========Service-Port=========
-OpenSSH: 22
+OpenSSH: 22, 2253, 42
 Dropbear: 443, 109, 143
 SSL/TLS: 443
 SSH Websocket SSL/TLS: 443
@@ -113,7 +113,7 @@ echo -e "===========HOST-SSH==========="
 echo -e "IP/Host: $IP"
 echo -e "Domain SSH: $domain"
 echo -e "=========Service-Port========="
-echo -e "OpenSSH: 22"
+echo -e "OpenSSH: 22, 2253, 42"
 echo -e "Dropbear: 443, 109, 143"
 echo -e "SSL/TLS: 443"
 echo -e "SSH Websocket SSL/TLS: 443"
