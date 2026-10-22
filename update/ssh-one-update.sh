@@ -139,7 +139,9 @@ release_version=$(tr -d '\r\n' < "$repo_root/VERSION")
 installed_version=$(tr -d '\r\n' < /etc/ssh-one/installation-complete)
 [[ $release_version =~ ^v[0-9]+$ ]] || fail 'the downloaded VERSION file is malformed.'
 [[ $installed_version =~ ^v[0-9]+$ ]] || fail 'the installed version marker is malformed; no files were changed.'
-if (( ${release_version#v} < ${installed_version#v} )); then fail "repository version $release_version is older than installed version $installed_version."; fi
+if (( ${release_version#v} < ${installed_version#v} )); then
+  note "GitHub branch rollback detected: repository $release_version is older than installed $installed_version. Applying the configured branch version."
+fi
 
 if [[ -r /etc/ssh-one/managed-files.sha256 ]]; then
   while IFS=$'\t' read -r target hash extra; do
@@ -250,7 +252,11 @@ if [[ ! -s /etc/ssh-one/runtime-files.sha256 ]]; then
 fi
 mv -fT -- /etc/ssh-one/.installation-complete.new /etc/ssh-one/installation-complete || fail 'could not activate the version marker.'
 committed=1
-note "Update complete: $installed_version -> $release_version."
+if (( ${release_version#v} < ${installed_version#v} )); then
+  note "Rollback complete: $installed_version -> $release_version from the configured GitHub branch."
+else
+  note "Update complete: $installed_version -> $release_version."
+fi
 note "Installed or refreshed ${#new_target[@]} managed files, including commands and menus; removed ${#removed_targets[@]} obsolete managed files when their recorded checksums matched."
 note 'Account data, unrelated service configuration, VPN binaries, operating-system packages, and unrelated firewall rules were preserved.'
 note 'The update migrates the old combined BadVPN service to three separate loopback listeners; check ssh-one-game-network status if a listener does not start.'

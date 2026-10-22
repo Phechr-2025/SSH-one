@@ -14,7 +14,7 @@
 - [โครงสร้าง response](#รายละเอียดข้อมูลที่ส่งกลับ)
 - [พฤติกรรมของบริการและวันหมดอายุ](#รูปแบบสร้างบัญชีและผลของคำสั่ง)
 - [ข้อควรรู้สำหรับระบบขาย](#ข้อควรรู้สำหรับระบบขาย)
-- [ขอบเขต API](#ขอบเขตของ-v28)
+- [ขอบเขต API](#ขอบเขตของ-v31)
 
 ## รูปแบบการเชื่อมต่อ
 
@@ -42,7 +42,7 @@ ssh -o PubkeyAuthentication=no -N -L 8765:127.0.0.1:8765 root@VPS_IP
 
 ## ติดตั้งและตรวจบริการ API
 
-การติดตั้ง v28 และตัวอัปเดตจะติดตั้ง/เปิด <code>ssh-one-api.service</code> อัตโนมัติ บริการทำงานเป็น root และฟังเฉพาะ <code>127.0.0.1:8765</code>; ไม่ต้องเปิดพอร์ตนี้ใน UFW หรือ firewall ของผู้ให้บริการ
+การติดตั้ง v31 และตัวอัปเดตจะติดตั้ง/เปิด <code>ssh-one-api.service</code> อัตโนมัติ บริการทำงานเป็น root และฟังเฉพาะ <code>127.0.0.1:8765</code>; ไม่ต้องเปิดพอร์ตนี้ใน UFW หรือ firewall ของผู้ให้บริการ
 
 ~~~~bash
 systemctl is-active ssh-one-api.service
@@ -54,7 +54,7 @@ ss -lntp | grep ':8765'
 
 ## เริ่มใช้งาน
 
-1. อัปเดต VPS เป็น v28 แล้วเปิดเมนูด้วย `menu`.
+1. อัปเดต VPS เป็น v31 แล้วเปิดเมนูด้วย `menu`.
 2. เลือก `27. API token management` แล้วเลือก `1. Create token`.
 3. ใส่ชื่อ token ยาว 1–64 ตัว (ขึ้นต้นด้วยตัวอักษรหรือตัวเลข ใช้ตัวอักษร ตัวเลข จุด ขีดล่าง เว้นวรรค และขีดกลางได้) แล้วใส่อายุ 1–3650 วัน; เว้นว่างใช้อายุเริ่มต้น 30 วัน.
 4. เก็บ token ที่แสดงไว้อย่างปลอดภัย รายการ token จะแสดง token เต็มรวมถึงรายการที่หมดอายุแล้ว จึงจำกัด SSH/root access ให้เฉพาะผู้ดูแลและลบ token ที่ไม่ใช้งาน
@@ -120,7 +120,7 @@ curl -sS http://127.0.0.1:8765/api/v1/health \
 ผลสำเร็จ:
 
 ```json
-{"ok":true,"version":"v28"}
+{"ok":true,"version":"v31"}
 ```
 
 ### ดูข้อมูล VPS และพอร์ต
@@ -282,11 +282,11 @@ ss -lntp | grep ':8765'
 
 ผล `ss` ควรแสดง `127.0.0.1:8765` เท่านั้น หากไม่มี listener ให้รัน `ssh-one-api --install-service` ด้วย root แล้วตรวจ journal
 
-## ขอบเขตของ v28
+## ขอบเขตของ v31
 
 API v1 จัดการบัญชี SSH, UDP Custom, Xray VMess, Xray VLESS, Xray Trojan และ Trojan-Go รวมถึงอ่านข้อมูลระบบ/พอร์ตและอ่าน payload/link ของบริการเหล่านี้ การดำเนินการ Xray ใช้ account helper และ restart Xray หลังเปลี่ยน config
 
-การจัดการ L2TP, PPTP, SSTP, WireGuard, Shadowsocks, ShadowsocksR, firewall, update, reboot, uninstall, DNS และงานตั้งค่าระบบ ยังใช้เมนู/คำสั่ง SSH ตามเดิมและ **ยังไม่มี endpoint API ใน v28** ไม่เปิด endpoint สำหรับสั่ง shell command ทั่วไปหรือเมนูที่มีผลระดับ root
+การจัดการ L2TP, PPTP, SSTP, WireGuard, Shadowsocks, ShadowsocksR, firewall, update, reboot, uninstall, DNS และงานตั้งค่าระบบ ยังใช้เมนู/คำสั่ง SSH ตามเดิมและ **ยังไม่มี endpoint API ใน v31** ไม่เปิด endpoint สำหรับสั่ง shell command ทั่วไปหรือเมนูที่มีผลระดับ root
 
 UDP Custom ไม่แสดงชื่อผู้ใช้ที่กำลังเชื่อมต่อได้จากตัวบริการปัจจุบัน API จึงคืนสถานะ/ข้อมูลบัญชีและ listener แต่ไม่รายงาน online username
 
