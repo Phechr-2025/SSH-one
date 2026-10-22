@@ -6,7 +6,7 @@
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
 </div>
 
-**Release: SSH-one 2.0 v2**
+**Release: SSH-one 2.0 v4**
 
 ## Install
 
@@ -40,10 +40,11 @@ For a step-by-step Thai walkthrough, see the [Thai installation guide](docs/inst
 - Option **1** manages UDP Custom and the host firewall. UDP Custom is installed by default.
 - Option **21** updates SSH-one managed files. A successful update reports the version and file changes, counts down for 10 seconds, then reboots.
 - Open **22. Settings → 21** to control whether actions return to the main menu. The default is off.
+- Open **22. Settings → 15. BBR manager** to check/install standard kernel BBR, update Ubuntu kernel packages, or enable/disable BBR. BBR is not installed or enabled automatically during setup. The main `menu` status shows whether BBR is active/available and the running kernel version.
 - Option **26** uninstalls SSH-one. Review the summary, back up data, and type <code>UNINSTALL</code> to confirm.
 - Option **27** creates, lists, and deletes API tokens. The default token lifetime is 30 days.
 
-SSH transport and UDP gateway behavior now use the original layout: OpenSSH uses TCP ports 22, 2253, and 42, and BadVPN runs one listener process for each loopback port. Updates migrate the previous combined BadVPN service and add TCP 42 to the active OpenSSH config with a backup and rollback check. If the SSH migration fails, retry with <code>/usr/bin/ssh-one-ssh-access apply</code> after resolving the reported issue. Allow TCP 42 separately in the VPS provider firewall/security group. Updates replace files in the managed manifest but do not update OS packages, other service configuration/accounts, or unrelated binaries. Uninstall removes some service data; it retains OpenSSH, OS packages, unlabelled firewall rules, and files modified after installation.
+SSH transport and UDP gateway behavior now use the original layout: OpenSSH uses TCP ports 22, 2253, and 42, and BadVPN runs one listener process for each loopback port. Updates migrate the previous combined BadVPN service and add TCP 42 in the active OpenSSH config with a backup and rollback check. If the SSH migration fails, retry with <code>/usr/bin/ssh-one-ssh-access apply</code> after resolving the reported issue. Allow TCP 42 separately in the VPS provider firewall/security group. General SSH-one updates replace files in the managed manifest but do not update OS packages; the BBR menu offers a separate, explicit Ubuntu kernel update. Other service configuration/accounts and unrelated binaries are preserved. Uninstall removes some service data; it retains OpenSSH, OS packages, unlabelled firewall rules, and files modified after installation.
 
 ## Services and default ports
 
@@ -78,6 +79,12 @@ Run `addwg` on the VPS to create a profile. The profile is saved as `/root/wg0-c
 To change the WireGuard listener, open `menu` → `Change Port WireGuard`. The script validates and applies the UDP port change, then prints the provider-firewall rule to add.
 
 This improves support for UDP games such as Roblox, whose support documentation lists dynamically selected UDP ports and says experience launch does not support proxies in some managed networks. It cannot guarantee every game or network: provider/ISP UDP filtering, NAT, routing, game policy, anti-cheat, or account restrictions can still prevent a connection. Latency also depends on the route between the player, VPS, and game server.
+
+## Standard BBR
+
+BBR is part of the Linux kernel, not a separate SSH-one binary, so it has no independent version number. The main menu reports whether standard `tcp_bbr` is active/available and shows the running kernel release, which supplies the BBR implementation. The manager enables `tcp_bbr` for new TCP connections and sets `fq` as the default queue discipline. It supports SSH-one v30 or newer on Ubuntu 20.04 amd64. **Settings → 15 → Update Ubuntu kernel / BBR** checks the OS and SSH-one version, matches the running kernel to an Ubuntu/provider kernel track, refreshes APT metadata, and verifies that the candidate comes from an official Ubuntu/ESM source. The recommended choice updates that matched track. If no track can be verified, it offers an optional latest official `linux-generic` candidate; APT resolves package dependencies automatically, but compatibility with the VPS provider is unverified. This option does not patch or modify kernel source. Both choices require explicit confirmation and a manual reboot. A provider-managed bootloader may continue to select the old kernel. SSH-one never purges kernels or changes bootloader settings.
+
+Ubuntu 20.04 standard support ended in May 2025. The newest kernel available depends on the configured signed Ubuntu repositories and Ubuntu Pro/ESM access. The manager cannot guarantee that a provider-specific or unfamiliar kernel will boot, or that BBR will reduce ping; check VPS snapshots/console access before changing kernel tracks.
 ## API for automation
 
 API v1 reads VPS/system/port information and creates, lists, reads, renews, or deletes SSH, UDP Custom, VMess, VLESS, Trojan, and Trojan-Go accounts. Connect through an SSH tunnel to <code>127.0.0.1:8765</code> and send a bearer token with every request. Do not expose the API port publicly or put secrets in a browser.

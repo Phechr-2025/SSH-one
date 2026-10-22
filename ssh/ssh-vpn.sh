@@ -433,9 +433,6 @@ clear
 # a possible Match block. Dropbear continues to use /etc/issue.net below.
 sed -i 's@DROPBEAR_BANNER=""@DROPBEAR_BANNER="/etc/issue.net"@g' /etc/default/dropbear
 
-# Install BBR
-#wget https://${akbarvpn}/bbr.sh && chmod +x bbr.sh && ./bbr.sh
-
 # Ganti Banner
 wget -O /etc/issue.net "https://${akbarvpn}/issue.net"
 
@@ -462,7 +459,6 @@ wget -O addhost "https://${akbarvpn}/addhost.sh"
 wget -O slhost "https://${akbarvpn}/slhost.sh"
 wget -O dns "https://${akbarvpn}/dns.sh"
 wget -O netf "https://${akbarvpn}/netf.sh"
-wget -O bbr2 "https://${akbarvpn}/bbr2.sh"
 wget -O about "https://${akbarvpn}/about.sh"
 wget -O menu "${SSH_ONE_RAW_BASE}/update/menu.sh"
 wget -O ssh-one-udp "${SSH_ONE_RAW_BASE}/update/udp-menu.sh"
@@ -569,7 +565,6 @@ chmod +x slhost
 chmod +x addhost
 chmod +x dns
 chmod +x netf
-chmod +x bbr2
 chmod +x menu
 chmod +x ssh-one-udp
 chmod +x addssh

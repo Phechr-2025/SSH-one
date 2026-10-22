@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Keep optional statistics tools from delaying or hiding the menu.
-MENU_VERSION='v28'
+MENU_VERSION='v30'
 if [[ -r /etc/ssh-one/installation-complete ]]; then
   installed_menu_version=''
   IFS= read -r installed_menu_version < /etc/ssh-one/installation-complete || true
@@ -98,6 +98,25 @@ cpu_usage() {
       'BEGIN { total1=u1+n1+s1+i1+w1+q1+r1+t1; total2=u2+n2+s2+i2+w2+q2+r2+t2; delta=total2-total1; idle=(i2+w2)-(i1+w1); if (delta <= 0) print "N/A"; else printf "%.1f", 100*(delta-idle)/delta }' 2>/dev/null || printf 'N/A'
 }
 
+bbr_summary() {
+  local kernel active available state
+  kernel=$(uname -r 2>/dev/null || printf 'unknown')
+  active=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || true)
+  available=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null || true)
+  if [[ " $available " == *' bbr '* ]]; then
+    if [[ $active == bbr ]]; then
+      state='ON (standard tcp_bbr)'
+    else
+      state='available, OFF'
+    fi
+  elif command -v modinfo >/dev/null 2>&1 && modinfo tcp_bbr >/dev/null 2>&1; then
+    state='installed, not active'
+  else
+    state='not available in running kernel'
+  fi
+  printf '%s♦️ BBR      : %s | kernel version: %s%s\n' "$white" "$state" "$kernel" "$reset"
+}
+
 traffic_value() {
   local json=$1 period=$2 year=$3 month=$4 day=${5:-0}
   [[ -n $json ]] || { printf 'N/A'; return; }
@@ -178,6 +197,7 @@ server_summary() {
   printf '%s♦️ Server Information ♦️%s\n' "$white" "$reset"
   printf '%s♦️ OS       : %s%s\n' "$white" "${os:-Linux}" "$reset"
   printf '%s♦️ KERNEL   : %s%s\n' "$white" "$(uname -r 2>/dev/null || printf 'N/A')" "$reset"
+  bbr_summary
   printf '%s♦️ UPTIME   : %s%s\n' "$white" "${uptime:-N/A}" "$reset"
   printf '%s♦️ CPU      : %s core (%s%%)%s\n' "$white" "${cores:-N/A}" "$cpu" "$reset"
   printf '%s♦️ RAM      : %s MB / %s MB%s\n' "$white" "${ram%%/*}" "${ram#*/}" "$reset"

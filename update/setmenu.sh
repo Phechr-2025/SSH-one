@@ -24,7 +24,7 @@ printf '%s\n' '11. Restart VPN services'
 printf '%s\n' '12. Installer information'
 printf '%s\n' '13. Renew Xray certificate'
 printf '%s\n' '14. Renew nameserver certificate'
-printf '%s\n' '15. Install BBRPLUS'
+printf '%s\n' '15. BBR manager'
 printf '%s\n' '16. Change Xray core'
 printf '%s\n' '17. Change SSH WebSocket banner'
 printf '%s\n' '18. Restore SSH + SSL/TLS port 443'
@@ -53,7 +53,7 @@ case $choice in
   12) about ;;
   13) certv2ray && restart ;;
   14) install-sldns && restart ;;
-  15) bbr2 && reboot ;;
+  15) ssh-one-bbr ;;
   16) wget -q -O /usr/bin/xraychanger 'https://raw.githubusercontent.com/NevermoreSSH/Xcore-custompath/main/xraychanger.sh' && chmod +x /usr/bin/xraychanger && xraychanger ;;
   17) nano /etc/issue.net ;;
   18) fssw ;;
