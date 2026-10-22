@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+SSH_ONE_ROLLBACK_AWARE=1
 set -Eeuo pipefail
 export LC_ALL=C
 
@@ -30,7 +31,7 @@ state_touched=0
 api_unit_preexisting=0
 [[ -e /etc/systemd/system/ssh-one-api.service || -L /etc/systemd/system/ssh-one-api.service ]] && api_unit_preexisting=1
 declare -a changed_targets=() removed_targets=()
-declare -A target_had_file=() new_target=() previous_hash=()
+declare -A target_had_file=() new_target=() previous_hash=() preserve_target=()
 
 rollback() {
   local target state_file rollback_failed=0
@@ -139,7 +140,11 @@ release_version=$(tr -d '\r\n' < "$repo_root/VERSION")
 installed_version=$(tr -d '\r\n' < /etc/ssh-one/installation-complete)
 [[ $release_version =~ ^v[0-9]+$ ]] || fail 'the downloaded VERSION file is malformed.'
 [[ $installed_version =~ ^v[0-9]+$ ]] || fail 'the installed version marker is malformed; no files were changed.'
-if (( ${release_version#v} < ${installed_version#v} )); then fail "repository version $release_version is older than installed version $installed_version."; fi
+if (( ${release_version#v} < ${installed_version#v} )); then
+  note "The configured GitHub branch is authoritative: applying rollback $installed_version -> $release_version."
+else
+  note "Applying the configured GitHub branch version $release_version (installed: $installed_version)."
+fi
 
 if [[ -r /etc/ssh-one/managed-files.sha256 ]]; then
   while IFS=$'\t' read -r target hash extra; do
@@ -165,7 +170,17 @@ while IFS=$'\t' read -r source target mode kind extra; do
     python) command -v python3 >/dev/null 2>&1 || fail 'python3 is required to validate this update.'; PYTHONPYCACHEPREFIX="$stage_dir/python-cache" python3 -m py_compile "$file" || fail "Python syntax check failed: $source" ;;
     binary) : ;;
   esac
-  install -m "$mode" -- "$file" "$stage_dir/new/$target" || fail "could not stage $target."
+  # Keep this rollback-capable updater when a selected older release carries
+  # the legacy monotonic-version updater. Otherwise the first downgrade would
+  # reinstall the old gate and prevent another rollback later.
+  if [[ $target == ssh-one-update && -f /usr/bin/ssh-one-update && ! -L /usr/bin/ssh-one-update ]] &&
+     grep -Fqx 'SSH_ONE_ROLLBACK_AWARE=1' /usr/bin/ssh-one-update &&
+     ! grep -Fqx 'SSH_ONE_ROLLBACK_AWARE=1' "$file"; then
+    preserve_target[$target]=1
+    note 'Preserving the rollback-capable updater from an older branch package.'
+  else
+    install -m "$mode" -- "$file" "$stage_dir/new/$target" || fail "could not stage $target."
+  fi
   new_target[$target]=1
 done < "$manifest"
 (( ${#new_target[@]} > 0 )) || fail 'the updater manifest has no files.'
@@ -199,6 +214,7 @@ if [[ -r /etc/ssh-one/managed-files.tsv ]]; then
 fi
 
 for target in "${!new_target[@]}"; do
+  [[ ${preserve_target[$target]:-0} == 1 ]] && continue
   changed_targets+=("$target")
   mv -fT -- "$stage_dir/new/$target" "/usr/bin/$target" || fail "could not install $target; rolling back."
 done
@@ -245,7 +261,11 @@ if [[ ! -s /etc/ssh-one/runtime-files.sha256 ]]; then
 fi
 mv -fT -- /etc/ssh-one/.installation-complete.new /etc/ssh-one/installation-complete || fail 'could not activate the version marker.'
 committed=1
-note "Update complete: $installed_version -> $release_version."
+if (( ${release_version#v} < ${installed_version#v} )); then
+  note "Rollback complete: $installed_version -> $release_version from the configured GitHub branch."
+else
+  note "Update complete: $installed_version -> $release_version from the configured GitHub branch."
+fi
 note "Installed or refreshed ${#new_target[@]} managed files, including commands and menus; removed ${#removed_targets[@]} obsolete managed files when their recorded checksums matched."
 note 'Account data, unrelated service configuration, VPN binaries, operating-system packages, and unrelated firewall rules were preserved.'
 note 'The update migrates the old combined BadVPN service to three separate loopback listeners; check ssh-one-game-network status if a listener does not start.'

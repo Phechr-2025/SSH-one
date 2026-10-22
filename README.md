@@ -6,7 +6,7 @@
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
 </div>
 
-**Release: SSH-one 2.0 v2**
+**Release: SSH-one 2.0 v3**
 
 ## Install
 
@@ -38,10 +38,12 @@ For a step-by-step Thai walkthrough, see the [Thai installation guide](docs/inst
 
 - Open the main menu with <code>menu</code>; if another command shadows it, use <code>/usr/bin/menu</code>.
 - Option **1** manages UDP Custom and the host firewall. UDP Custom is installed by default.
-- Option **21** updates SSH-one managed files. A successful update reports the version and file changes, counts down for 10 seconds, then reboots.
+- Option **21** updates SSH-one managed files from the configured GitHub branch, even when its `VERSION` is lower than the installed marker. A successful update reports the version and file changes, counts down for 10 seconds, then reboots.
 - Open **22. Settings → 21** to control whether actions return to the main menu. The default is off.
 - Option **26** uninstalls SSH-one. Review the summary, back up data, and type <code>UNINSTALL</code> to confirm.
 - Option **27** creates, lists, and deletes API tokens. The default token lifetime is 30 days.
+
+> **Version compatibility:** `VERSION` is `v30` so servers with the older v30 updater can install this transition release. After it is installed, updates follow the configured GitHub branch even when its `VERSION` is lower (for example, v28). Install this release before pointing the branch to a lower version; an older updater cannot be changed remotely before it accepts an update.
 
 SSH transport and UDP gateway behavior now use the original layout: OpenSSH uses TCP ports 22, 2253, and 42, and BadVPN runs one listener process for each loopback port. Updates migrate the previous combined BadVPN service and replace files in the managed manifest. They do not update OS packages, other service configuration/accounts, or unrelated binaries. Uninstall removes some service data; it retains OpenSSH, OS packages, unlabelled firewall rules, and files modified after installation.
 
