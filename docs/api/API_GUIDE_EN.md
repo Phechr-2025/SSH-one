@@ -49,7 +49,7 @@ Keep the tunnel process running while making API calls to <code>http://127.0.0.1
 
 ## Install and check the API service
 
-A fresh v30 installation and the v30 updater install and enable <code>ssh-one-api.service</code>. The daemon runs as root and listens only on <code>127.0.0.1:8765</code>; do not open this port in UFW or the provider firewall.
+A fresh v28 installation and the v28 updater install and enable <code>ssh-one-api.service</code>. The daemon runs as root and listens only on <code>127.0.0.1:8765</code>; do not open this port in UFW or the provider firewall.
 
 ~~~~bash
 systemctl is-active ssh-one-api.service
@@ -70,7 +70,7 @@ On the VPS, open <code>menu</code>, select <code>27. API token management</code>
 
 Choose <code>2. List tokens</code> to see each token name, full token value, expiry, and active/expired state. Choose <code>3. Delete token</code>, then enter its name or exact token value to revoke it. Expired tokens are rejected even if they remain visible in the list. Revoke a token immediately if it is exposed or no longer needed.
 
-The daemon runs as root, so every token can manage every supported account. There are no per-token scopes or read-only tokens in v30. Treat a token like administrator access. Use separate tokens per integration for simpler revocation, and treat token-list output as secret data. Token records are stored at <code>/etc/ssh-one/api-tokens.json</code> with root-only permissions (<code>0600</code>).
+The daemon runs as root, so every token can manage every supported account. There are no per-token scopes or read-only tokens in v28. Treat a token like administrator access. Use separate tokens per integration for simpler revocation, and treat token-list output as secret data. Token records are stored at <code>/etc/ssh-one/api-tokens.json</code> with root-only permissions (<code>0600</code>).
 
 ## Request format and account rules
 
@@ -135,7 +135,7 @@ curl -sS http://127.0.0.1:8765/api/v1/health -H 'Authorization: Bearer YOUR_TOKE
 Expected response:
 
 ~~~~json
-{"ok":true,"version":"v30"}
+{"ok":true,"version":"v28"}
 ~~~~
 
 ### Read VPS information and ports
@@ -292,7 +292,7 @@ The listener should be <code>127.0.0.1:8765</code>. If it is missing, run <code>
 
 API v1 supports system/port information and account operations for SSH, UDP Custom, Xray VMess, Xray VLESS, Xray Trojan, and Trojan-Go. The API can return account password values when they are available, expiry, host, listener port, and connection payload/link information.
 
-There are no v30 API endpoints for L2TP, PPTP, SSTP, WireGuard, Shadowsocks, ShadowsocksR, firewall, DNS/Cloudflare, update, reboot, uninstall, arbitrary shell commands, or other system-wide menu operations. Manage those through the existing menu or SSH. The API intentionally does not provide a general root shell endpoint.
+There are no v28 API endpoints for L2TP, PPTP, SSTP, WireGuard, Shadowsocks, ShadowsocksR, firewall, DNS/Cloudflare, update, reboot, uninstall, arbitrary shell commands, or other system-wide menu operations. Manage those through the existing menu or SSH. The API intentionally does not provide a general root shell endpoint.
 
 The current UDP Custom service does not provide a reliable per-username online session list, so the API cannot report which UDP account is currently connected. It returns the account and listener information only.
 ## Response fields and schemas

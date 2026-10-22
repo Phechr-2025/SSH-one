@@ -1,4 +1,4 @@
-# คู่มือเตรียมค่า SSH-one v30
+# คู่มือเตรียมค่า SSH-one v28
 
 ตัวติดตั้งถาม Host/subdomain และ Cloudflare API Token โดยตรวจ DNS ให้ผ่านก่อนเริ่มติดตั้งบริการ
 

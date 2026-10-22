@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Keep optional statistics tools from delaying or hiding the menu.
-MENU_VERSION='v30'
+MENU_VERSION='v28'
 if [[ -r /etc/ssh-one/installation-complete ]]; then
   installed_menu_version=''
   IFS= read -r installed_menu_version < /etc/ssh-one/installation-complete || true

@@ -35,13 +35,8 @@ stop_instances() {
   for port in 7100 7200 7300; do
     unit="$base@$port.service"
     systemctl stop "$unit" >/dev/null 2>&1 || true
-    if systemctl is-active --quiet "$unit"; then
-      fail "could not stop $unit."
-    fi
+    systemctl is-active --quiet "$unit" && fail "could not stop $unit."
   done
-  # An inactive listener is expected before first install. Return success
-  # explicitly so its status check cannot trip the caller's `set -e`.
-  return 0
 }
 
 clean_legacy_rc_local() {
@@ -105,11 +100,12 @@ apply_services() {
   write_template
   systemctl daemon-reload || fail 'systemd could not load the BadVPN template.'
   for port in 7100 7200 7300; do
-    if ! systemctl enable --now "$base@$port.service" >/dev/null; then
-      show_unit_diagnostics "$base@$port.service"
+    systemctl enable --now "$base@$port.service" >/dev/null ||
       fail "could not start the independent BadVPN listener at 127.0.0.1:$port."
-    fi
-    wait_for_listener "$port"
+    systemctl is-active --quiet "$base@$port.service" ||
+      fail "BadVPN listener at 127.0.0.1:$port is not active."
+    ss -H -ltn | awk -v p="127.0.0.1:$port" '$4 == p { found=1 } END { exit !found }' ||
+      fail "BadVPN is not listening at 127.0.0.1:$port."
   done
   printf 'BadVPN is running as three separate listeners on loopback TCP 7100, 7200, and 7300.\n'
 }
@@ -121,43 +117,12 @@ show_status() {
   done
 }
 
-show_unit_diagnostics() {
-  local unit=$1
-  printf '\n--- systemd status: %s ---\n' "$unit" >&2
-  systemctl --no-pager --full status "$unit" >&2 || true
-  if command -v journalctl >/dev/null 2>&1; then
-    printf '\n--- recent journal: %s ---\n' "$unit" >&2
-    journalctl -u "$unit" -n 40 --no-pager >&2 || true
-  fi
-  printf '\n--- current TCP listeners ---\n' >&2
-  ss -H -ltnp >&2 || true
-}
-
-wait_for_listener() {
-  local port=$1 unit="$base@$1.service" attempt=0
-  while (( attempt < 50 )); do
-    ((attempt += 1))
-    if ss -H -ltn | awk -v p="127.0.0.1:$port" '$4 == p { found=1 } END { exit !found }'; then
-      return 0
-    fi
-    if ! systemctl is-active --quiet "$unit"; then
-      show_unit_diagnostics "$unit"
-      fail "BadVPN service $unit stopped before opening TCP 127.0.0.1:$port."
-    fi
-    sleep 0.2
-  done
-  show_unit_diagnostics "$unit"
-  fail "BadVPN service $unit stayed active but did not open TCP 127.0.0.1:$port after 10 seconds."
-}
-
 remove_services() {
   stop_legacy
   for port in 7100 7200 7300; do
     unit="$base@$port.service"
     systemctl disable --now "$unit" >/dev/null 2>&1 || true
-    if systemctl is-active --quiet "$unit"; then
-      fail "could not stop $unit; its unit files were retained."
-    fi
+    systemctl is-active --quiet "$unit" && fail "could not stop $unit; its unit files were retained."
   done
   stop_old_processes
   clean_legacy_rc_local
