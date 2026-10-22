@@ -6,7 +6,9 @@
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
 </div>
 
-**Release: SSH-one 2.0 v3**
+**Release: SSH-one 2.0 v4**
+
+v4 fixes a shell status-handling bug that made a fresh BadVPN install stop when its services were correctly inactive, and could also interrupt BadVPN removal.
 
 ## Install
 

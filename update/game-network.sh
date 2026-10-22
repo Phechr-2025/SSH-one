@@ -35,8 +35,13 @@ stop_instances() {
   for port in 7100 7200 7300; do
     unit="$base@$port.service"
     systemctl stop "$unit" >/dev/null 2>&1 || true
-    systemctl is-active --quiet "$unit" && fail "could not stop $unit."
+    if systemctl is-active --quiet "$unit"; then
+      fail "could not stop $unit."
+    fi
   done
+  # An inactive listener is expected before first install. Return success
+  # explicitly so its status check cannot trip the caller's `set -e`.
+  return 0
 }
 
 clean_legacy_rc_local() {
@@ -122,7 +127,9 @@ remove_services() {
   for port in 7100 7200 7300; do
     unit="$base@$port.service"
     systemctl disable --now "$unit" >/dev/null 2>&1 || true
-    systemctl is-active --quiet "$unit" && fail "could not stop $unit; its unit files were retained."
+    if systemctl is-active --quiet "$unit"; then
+      fail "could not stop $unit; its unit files were retained."
+    fi
   done
   stop_old_processes
   clean_legacy_rc_local

@@ -6,7 +6,9 @@
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
 </div>
 
-**รุ่น: SSH-one 2.0 v3**
+**รุ่น: SSH-one 2.0 v4**
+
+v4 แก้บั๊กการตรวจสถานะ service ที่ทำให้การติดตั้ง BadVPN ใหม่หยุด ทั้งที่ service ยังไม่ทำงานตามปกติ และอาจทำให้ขั้นตอนถอนการติดตั้งหยุดกลางทาง
 
 ## ติดตั้ง
 
