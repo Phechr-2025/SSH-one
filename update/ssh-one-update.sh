@@ -208,6 +208,11 @@ if [[ -x /usr/bin/ssh-one-game-network ]]; then
     note 'BadVPN listener migration reported a problem; review its message and run ssh-one-game-network status.'
   fi
 fi
+if [[ -x /usr/bin/ssh-one-ssh-access ]]; then
+  if ! /usr/bin/ssh-one-ssh-access apply; then
+    note 'OpenSSH port migration failed; the original SSH config was restored. Inspect the error above.'
+  fi
+fi
 # v26 adds the loopback API service. Install/update its systemd unit from the
 # newly installed command; the listener never binds to a public address.
 if [[ -x /usr/bin/ssh-one-api ]]; then

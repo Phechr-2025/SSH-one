@@ -43,7 +43,7 @@ For a step-by-step Thai walkthrough, see the [Thai installation guide](docs/inst
 - Option **26** uninstalls SSH-one. Review the summary, back up data, and type <code>UNINSTALL</code> to confirm.
 - Option **27** creates, lists, and deletes API tokens. The default token lifetime is 30 days.
 
-SSH transport and UDP gateway behavior now use the original layout: OpenSSH uses TCP ports 22, 2253, and 42, and BadVPN runs one listener process for each loopback port. Updates migrate the previous combined BadVPN service and replace files in the managed manifest. They do not update OS packages, other service configuration/accounts, or unrelated binaries. Uninstall removes some service data; it retains OpenSSH, OS packages, unlabelled firewall rules, and files modified after installation.
+SSH transport and UDP gateway behavior now use the original layout: OpenSSH uses TCP ports 22, 2253, and 42, and BadVPN runs one listener process for each loopback port. Updates migrate the previous combined BadVPN service and add TCP 42 to the active OpenSSH config with a backup and rollback check. If the SSH migration fails, retry with <code>/usr/bin/ssh-one-ssh-access apply</code> after resolving the reported issue. Allow TCP 42 separately in the VPS provider firewall/security group. Updates replace files in the managed manifest but do not update OS packages, other service configuration/accounts, or unrelated binaries. Uninstall removes some service data; it retains OpenSSH, OS packages, unlabelled firewall rules, and files modified after installation.
 
 ## Services and default ports
 
