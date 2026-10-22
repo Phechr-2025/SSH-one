@@ -6,9 +6,9 @@
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
 </div>
 
-**รุ่น: SSH-one 2.0 v4**
+**รุ่น: SSH-one 2.0 v5**
 
-v4 แก้บั๊กการตรวจสถานะ service ที่ทำให้การติดตั้ง BadVPN ใหม่หยุด ทั้งที่ service ยังไม่ทำงานตามปกติ และอาจทำให้ขั้นตอนถอนการติดตั้งหยุดกลางทาง
+v5 รอให้ BadVPN เปิด listener ก่อนตรวจ พร้อมบันทึกสถานะและ journal ลง log ติดตั้ง และเพิ่ม dependency PCRE2 สำหรับ build Accel-PPP โดยให้ขั้นตอน SSTP หยุดทันทีเมื่อ build ล้มเหลว
 
 ## ติดตั้ง
 

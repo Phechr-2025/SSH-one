@@ -134,6 +134,13 @@ download_script() {
 run_installer() {
 	local name=$1 path=$2 url=$3
 	download_script "$path" "$url" || return 1
+	if [[ $name == SSTP ]]; then
+		if ( set -o pipefail; bash "./$path" 2>&1 | tee -a /root/log-install.txt ); then
+			return 0
+		fi
+		report_error "$name installer failed: $path"
+		return 1
+	fi
 	if ! bash "./$path"; then
 		report_error "$name installer failed: $path"
 		return 1
@@ -219,7 +226,8 @@ if ! bash "$SSH_ONE_SOURCE_ROOT/update/install-managed-files.sh"; then
 	report_error "Could not safely install the SSH-one command inventory."
 	exit 1
 fi
-if ! /usr/bin/ssh-one-game-network apply; then
+
+if ! ( set -o pipefail; /usr/bin/ssh-one-game-network apply 2>&1 | tee -a /root/log-install.txt ); then
 	report_error "Could not configure the game-capable UDP network services."
 	exit 1
 fi

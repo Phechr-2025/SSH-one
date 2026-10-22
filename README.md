@@ -6,9 +6,9 @@
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
 </div>
 
-**Release: SSH-one 2.0 v4**
+**Release: SSH-one 2.0 v5**
 
-v4 fixes a shell status-handling bug that made a fresh BadVPN install stop when its services were correctly inactive, and could also interrupt BadVPN removal.
+v5 waits for BadVPN listeners to become ready and records service diagnostics in the install log. It also installs the Accel-PPP PCRE2 build dependency and stops SSTP setup when a build step fails.
 
 ## Install
 

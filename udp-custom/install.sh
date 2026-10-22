@@ -128,12 +128,13 @@ had_exclude=0
 [[ ! -e $exclude_file ]] || { had_exclude=1; cp -a -- "$exclude_file" "$tmp/old-exclusions"; }
 was_active=0
 was_enabled=0
-systemctl is-active --quiet udp-custom.service && was_active=1 || true
-systemctl is-enabled --quiet udp-custom.service && was_enabled=1 || true
+systemctl is-active --quiet udp-custom.service >/dev/null 2>&1 && was_active=1 || true
+systemctl is-enabled --quiet udp-custom.service >/dev/null 2>&1 && was_enabled=1 || true
 
 wait_for_udp_custom() {
-  local attempt
-  for attempt in 1 2 3 4 5; do
+  local attempt=0
+  while (( attempt < 5 )); do
+    ((attempt += 1))
     if systemctl is-active --quiet udp-custom.service; then
       sleep 1
       systemctl is-active --quiet udp-custom.service && return 0
