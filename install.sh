@@ -107,7 +107,7 @@ touch /root/log-install.txt || fail 'cannot create /root/log-install.txt.'
 command -v flock >/dev/null 2>&1 || fail 'flock is required; install util-linux and try again.'
 exec 9>/run/lock/ssh-one-install.lock || fail 'cannot create the SSH-one installation lock.'
 flock -n 9 || fail 'another SSH-one installation is already running.'
-printf '\n==== SSH-one v25 install attempt: %s ====\n' "$(date -Is)" >> /root/log-install.txt
+printf '\n==== SSH-one v27 install attempt: %s ====\n' "$(date -Is)" >> /root/log-install.txt
 
 if [[ -e /etc/ssh-one/installation-complete ]]; then
   fail 'SSH-one is already installed. This installer will not run a second time.'

@@ -158,17 +158,7 @@ sed -i "s|__SSH_ONE_REPO_URL__|${SSH_ONE_REPO_URL}|g" /home/vps/public_html/inde
 /etc/init.d/nginx restart
 cd
 
-# install badvpn
-cd
-wget -O /usr/bin/badvpn-udpgw "https://${akbarvpn}/badvpn-udpgw64"
-chmod +x /usr/bin/badvpn-udpgw
-sed -i '$ i\screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7100 --max-clients 500' /etc/rc.local
-sed -i '$ i\screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7200 --max-clients 500' /etc/rc.local
-sed -i '$ i\screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 500' /etc/rc.local
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7100 --max-clients 500
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7200 --max-clients 500
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 500
-
+# BadVPN is installed and supervised after managed files are registered.
 
 # Configure SSH access in the global section, before any Match blocks. Keep a
 # backup and roll back if validation, restart, or listener checks fail.
@@ -669,9 +659,6 @@ chown -R www-data:www-data /home/vps/public_html
 /etc/init.d/vnstat restart
 /etc/init.d/fail2ban restart
 /etc/init.d/squid restart
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7100 --max-clients 500
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7200 --max-clients 500
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 500
 history -c
 echo "unset HISTFILE" >> /etc/profile
 

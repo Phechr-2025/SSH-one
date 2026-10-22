@@ -1,71 +1,49 @@
-#!/bin/bash
-# ==========================================
-# Color
-RED='\033[0;31m'
-NC='\033[0m'
-GREEN='\033[0;32m'
-ORANGE='\033[0;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-LIGHT='\033[0;37m'
-# ==========================================
-# Getting
-MYIP=$(wget -qO- ipinfo.io/ip);
-echo "Checking VPS"
-IZIN=$( curl ipinfo.io/ip | grep $MYIP )
-if [ $MYIP = $MYIP ]; then
-echo -e "${NC}${GREEN}Permission Accepted...${NC}"
-else
-echo -e "${NC}${RED}Permission Denied!${NC}";
-echo -e "${NC}${LIGHT}Fuck You!!"
-exit 0
+#!/usr/bin/env bash
+set -Eeuo pipefail
+export LC_ALL=C
+umask 077
+fail() { printf 'WireGuard account delete: %s\n' "$*" >&2; exit 1; }
+[[ ${EUID:-$(id -u)} -eq 0 ]] || fail 'run as root.'
+[[ -f /etc/wireguard/params && ! -L /etc/wireguard/params && -f /etc/wireguard/wg0.conf && ! -L /etc/wireguard/wg0.conf ]] || fail 'WireGuard config and parameters must be regular files.'
+for tool in awk mktemp systemctl wg-quick; do command -v "$tool" >/dev/null 2>&1 || fail "$tool is required."; done
+# shellcheck source=/etc/wireguard/params
+. /etc/wireguard/params
+[[ ${SERVER_WG_NIC:-} =~ ^wg[0-9]+$ ]] || fail 'WireGuard interface name is invalid.'
+mapfile -t CLIENTS < <(awk '$1=="###" && $2=="Client" {print $3 " " $4}' "/etc/wireguard/$SERVER_WG_NIC.conf")
+(( ${#CLIENTS[@]} > 0 )) || fail 'there are no WireGuard clients.'
+printf 'Select the WireGuard account to delete:\n'
+for i in "${!CLIENTS[@]}"; do printf '%2d) %s\n' "$((i+1))" "${CLIENTS[$i]}"; done
+read -r -p 'Account number: ' number || fail 'could not read account number.'
+if [[ ! $number =~ ^[0-9]+$ ]] || (( number < 1 || number > ${#CLIENTS[@]} )); then
+  fail 'invalid account number.'
 fi
-clear
-source /etc/wireguard/params
-	NUMBER_OF_CLIENTS=$(grep -c -E "^### Client" "/etc/wireguard/$SERVER_WG_NIC.conf")
-	if [[ ${NUMBER_OF_CLIENTS} == '0' ]]; then
-		clear
-		echo ""
-		echo "You have no existing clients!"
-		exit 1
-	fi
+read -r user expiry <<< "${CLIENTS[$((number-1))]}"
+[[ $user =~ ^[A-Za-z0-9_]{1,32}$ && $expiry =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || fail 'saved WireGuard account marker is malformed.'
 
-	clear
-	echo ""
-	echo ""
-	echo " Select the existing client you want to remove"
-	echo " Press CTRL+C to return"
-	echo " ==============================="
-	echo "     No  Expired   User"
-	grep -E "^### Client" "/etc/wireguard/$SERVER_WG_NIC.conf" | cut -d ' ' -f 3-4 | nl -s ') '
-	until [[ ${CLIENT_NUMBER} -ge 1 && ${CLIENT_NUMBER} -le ${NUMBER_OF_CLIENTS} ]]; do
-		if [[ ${CLIENT_NUMBER} == '1' ]]; then
-			read -rp "Select one client [1]: " CLIENT_NUMBER
-		else
-			read -rp "Select one client [1-${NUMBER_OF_CLIENTS}]: " CLIENT_NUMBER
-		fi
-	done
-
-# match the selected number to a client name
-CLIENT_NAME=$(grep -E "^### Client" "/etc/wireguard/$SERVER_WG_NIC.conf" | cut -d ' ' -f 3-4 | sed -n "${CLIENT_NUMBER}"p)
-user=$(grep -E "^### Client" "/etc/wireguard/$SERVER_WG_NIC.conf" | cut -d ' ' -f 3 | sed -n "${CLIENT_NUMBER}"p)
-exp=$(grep -E "^### Client" "/etc/wireguard/$SERVER_WG_NIC.conf" | cut -d ' ' -f 4 | sed -n "${CLIENT_NUMBER}"p)
-
-# remove [Peer] block matching $CLIENT_NAME
-sed -i "/^### Client $user $exp/,/^AllowedIPs/d" /etc/wireguard/wg0.conf
-# remove generated client file
-rm -f "/home/vps/public_html/$user.conf"
-
-# restart wireguard to apply changes
-systemctl restart "wg-quick@$SERVER_WG_NIC"
-service cron restart
-clear
-echo ""
-echo "============================="
-echo "  Wireguard Account Deleted  "
-echo "============================="
-echo "Username  : $user"
-echo "Expired   : $exp"
-echo "============================="
-echo "Script Mod"
+config="/etc/wireguard/$SERVER_WG_NIC.conf"
+backup=$(mktemp /etc/wireguard/.wg0.conf.pre-delete.XXXXXX) || fail 'could not stage a backup.'
+cp -a -- "$config" "$backup" || fail 'could not back up the server config.'
+tmp=$(mktemp /etc/wireguard/.wg0.conf.delete.XXXXXX) || { rm -f -- "$backup"; fail 'could not stage the server config.'; }
+if ! awk -v marker="### Client $user $expiry" '
+  $0==marker { if (skip) exit 2; skip=1; found=1; next }
+  skip && /^AllowedIPs[[:space:]]*=/ { skip=0; next }
+  skip { next }
+  { print }
+  END { if (!found || skip) exit 1 }
+' "$config" > "$tmp"; then
+  rm -f -- "$backup" "$tmp"
+  fail 'could not find a complete client block; no changes were applied.'
+fi
+chmod --reference="$config" "$tmp"
+mv -fT -- "$tmp" "$config" || { cp -a -- "$backup" "$config"; rm -f -- "$backup"; fail 'could not activate the server config.'; }
+if ! wg-quick strip "$SERVER_WG_NIC" >/dev/null || ! systemctl restart "wg-quick@$SERVER_WG_NIC" || ! systemctl is-active --quiet "wg-quick@$SERVER_WG_NIC"; then
+  cp -a -- "$backup" "$config"
+  systemctl restart "wg-quick@$SERVER_WG_NIC" >/dev/null 2>&1 || true
+  rm -f -- "$backup"
+  fail 'WireGuard did not restart; the previous server config was restored.'
+fi
+rm -f -- "$backup"
+for file in "/root/$SERVER_WG_NIC-client-$user.conf" "/home/vps/public_html/$user.conf"; do
+  [[ ! -L $file && -f $file ]] && rm -f -- "$file"
+done
+printf 'Deleted WireGuard account %s (expired %s).\n' "$user" "$expiry"

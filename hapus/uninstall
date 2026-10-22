@@ -24,12 +24,21 @@ flock -n 9 || fail 'an update is running; retry after it finishes.'
 exec 7>/run/lock/ssh-one-uninstall.lock || fail 'could not create the uninstall lock.'
 flock -n 7 || fail 'another SSH-one uninstall is already running.'
 
+if [[ -f /etc/wireguard/wg0.conf && ! -L /etc/wireguard/wg0.conf ]]; then
+  if systemctl is-active --quiet wg-quick@wg0.service; then
+    systemctl stop wg-quick@wg0.service >/dev/null 2>&1 || fail 'WireGuard is still running; no uninstall files were removed. Inspect systemctl status wg-quick@wg0 and retry.'
+    systemctl is-active --quiet wg-quick@wg0.service && fail 'WireGuard is still active; no uninstall files were removed.'
+  fi
+  systemctl disable wg-quick@wg0.service >/dev/null 2>&1 || note 'could not disable wg-quick@wg0.service; verify it is not enabled after uninstall.'
+fi
+
 log_file=/root/log-install.txt
 printf '\n==== SSH-one uninstall started: %s ====\n' "$(date -Is)" >> "$log_file"
 preserved=0
 
 units=(
   'udp-custom.service|/root/udp/udp-custom'
+  'ssh-one-badvpn-udpgw.service|ExecStart=/usr/bin/badvpn-udpgw'
   'ssh-one-udp-expiry.service|ExecStart=/usr/bin/ssh-one-udp-expiry'
   'ssh-one-udp-expiry.timer|Unit=ssh-one-udp-expiry.service'
   'ssh-one-api.service|ExecStart=/usr/bin/ssh-one-api serve'
@@ -194,6 +203,20 @@ if [[ -r /etc/ssh-one/managed-files.sha256 ]]; then
   done < /etc/ssh-one/managed-files.sha256
 else
   note 'no managed-command checksum inventory exists; command files were preserved.'
+  preserved=1
+fi
+
+forwarding_file=/etc/sysctl.d/99-ssh-one-wireguard.conf
+if [[ -f $forwarding_file && ! -L $forwarding_file ]]; then
+  if [[ $(<"$forwarding_file") == $'# SSH-one WireGuard IPv4 game/network forwarding\nnet.ipv4.ip_forward=1' ]]; then
+    rm -f -- "$forwarding_file"
+    note 'removed the verified SSH-one WireGuard forwarding setting.'
+  else
+    note "preserved modified forwarding settings: $forwarding_file"
+    preserved=1
+  fi
+elif [[ -e $forwarding_file || -L $forwarding_file ]]; then
+  note "preserved unexpected forwarding settings path: $forwarding_file"
   preserved=1
 fi
 

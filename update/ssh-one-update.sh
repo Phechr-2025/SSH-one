@@ -203,6 +203,11 @@ for target in "${!new_target[@]}"; do
   mv -fT -- "$stage_dir/new/$target" "/usr/bin/$target" || fail "could not install $target; rolling back."
 done
 
+if [[ -x /usr/bin/ssh-one-game-network ]]; then
+  if ! /usr/bin/ssh-one-game-network apply; then
+    note 'game-network migration reported a problem; review its message and run ssh-one-game-network status.'
+  fi
+fi
 # v26 adds the loopback API service. Install/update its systemd unit from the
 # newly installed command; the listener never binds to a public address.
 if [[ -x /usr/bin/ssh-one-api ]]; then
@@ -242,7 +247,8 @@ mv -fT -- /etc/ssh-one/.installation-complete.new /etc/ssh-one/installation-comp
 committed=1
 note "Update complete: $installed_version -> $release_version."
 note "Installed or refreshed ${#new_target[@]} managed files, including commands and menus; removed ${#removed_targets[@]} obsolete managed files when their recorded checksums matched."
-note 'Account data, service configuration, VPN binaries, operating-system packages, and firewall rules were preserved.'
+note 'Account data, unrelated service configuration, VPN binaries, operating-system packages, and unrelated firewall rules were preserved.'
+note 'The game-network migration may update /etc/rc.local, /etc/wireguard/wg0.conf, IPv4 forwarding settings, and existing public WireGuard profiles; review its backups and output.'
 note 'The VPS will reboot in 10 seconds to activate the updated commands and menu. The SSH connection may close.'
 for remaining in {10..1}; do
   printf '\rRestarting VPS in %2d seconds...' "$remaining"

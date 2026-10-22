@@ -63,7 +63,7 @@ if ! install -d -m 0755 /etc/ssh-one; then
 	report_error "Could not create the SSH-one state directory."
 	exit 1
 fi
-if ! printf 'v26 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
+if ! printf 'v27 started at %s\n' "$(date -Is)" > /etc/ssh-one/install-in-progress; then
 	report_error "Could not write the installation-in-progress marker."
 	exit 1
 fi
@@ -219,6 +219,10 @@ if ! bash "$SSH_ONE_SOURCE_ROOT/update/install-managed-files.sh"; then
 	report_error "Could not safely install the SSH-one command inventory."
 	exit 1
 fi
+if ! /usr/bin/ssh-one-game-network apply; then
+	report_error "Could not configure the game-capable UDP network services."
+	exit 1
+fi
 if [[ ! -x /usr/bin/menu ]] || ! /usr/bin/menu --check; then
 	report_error "The main menu failed its post-installation check. Run /usr/bin/menu --check for details."
 	exit 1
@@ -249,9 +253,9 @@ echo "   - CloudFront Websocket    : "  | tee -a /root/log-install.txt
 echo "   - SSH Websocket TLS       : 443"  | tee -a /root/log-install.txt
 echo "   - SSH Websocket HTTP      : 8880"  | tee -a /root/log-install.txt
 echo "   - Websocket OpenVPN       : 2086"  | tee -a /root/log-install.txt
-echo "   - BadVPN UDPGW            : TCP 7100, 7200, 7300 (loopback gateway)"  | tee -a /root/log-install.txt
+echo "   - BadVPN UDPGW            : loopback TCP 7100, 7200, 7300 (compatible SSH apps)"  | tee -a /root/log-install.txt
 echo "   - Nginx                   : 89"  | tee -a /root/log-install.txt
-echo "   - Wireguard               : 7070"  | tee -a /root/log-install.txt
+echo "   - WireGuard Game Tunnel   : UDP 7070 (IPv4 full tunnel)"  | tee -a /root/log-install.txt
 echo "   - L2TP/IPsec              : UDP 500, 1701, 4500"  | tee -a /root/log-install.txt
 echo "   - PPTP VPN                : 1732"  | tee -a /root/log-install.txt
 echo "   - SSTP VPN                : 444"  | tee -a /root/log-install.txt
@@ -342,7 +346,7 @@ if [[ ! $source_commit =~ ^[a-f0-9]{40}$ ]]; then source_commit='unknown'; fi
 printf '%s\n' "$source_commit" > /etc/ssh-one/.source-commit.new || { report_error "Could not prepare the GitHub source reference."; exit 1; }
 chmod 0644 /etc/ssh-one/.source-commit.new || { report_error "Could not set permissions on the GitHub source reference."; exit 1; }
 mv -fT -- /etc/ssh-one/.source-commit.new /etc/ssh-one/source-commit || { report_error "Could not activate the GitHub source reference."; exit 1; }
-printf 'v26\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
+printf 'v27\n' > /etc/ssh-one/.installation-complete.new || { report_error "Could not prepare the installation marker."; exit 1; }
 mv -fT -- /etc/ssh-one/.installation-complete.new /etc/ssh-one/installation-complete || { report_error "Could not activate the installation marker."; exit 1; }
 rm -f /etc/ssh-one/install-in-progress || { report_error "Could not remove the installation-in-progress marker."; exit 1; }
 printf 'Installation complete. SSH config and TCP 22/2253 listeners passed checks. VPS will reboot in 10 seconds.\n' | tee -a /root/log-install.txt

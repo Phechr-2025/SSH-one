@@ -99,21 +99,10 @@ sed -i '/^'"$user"'/d' /home/sstp/sstp_account
 fi
 done
 
-# AUTO REMOVE WIREGUARD
-data=( `cat /etc/wireguard/wg0.conf | grep '^### Client' | cut -d ' ' -f 3`);
-now=`date +"%Y-%m-%d"`
-for user in "${data[@]}"
-do
-exp=$(grep -w "^### Client $user" "/etc/wireguard/wg0.conf" | cut -d ' ' -f 4)
-d1=$(date -d "$exp" +%s)
-d2=$(date -d "$now" +%s)
-exp2=$(( (d1 - d2) / 86400 ))
-if [[ "$exp2" = "0" ]]; then
-sed -i "/^### Client $user $exp/,/^AllowedIPs/d" /etc/wireguard/wg0.conf
-rm -f "/home/vps/public_html/$user.conf"
+# AUTO REMOVE EXPIRED WIREGUARD ACCOUNTS
+if command -v ssh-one-wireguard-expiry >/dev/null 2>&1; then
+	ssh-one-wireguard-expiry || echo "Warning: WireGuard expiry cleanup failed; inspect the error above." >&2
 fi
-done
-systemctl restart wg-quick@wg0
 
 #----- Auto Remove Vmess
 XRAY_ACCOUNTS_REMOVED=0

@@ -6,7 +6,7 @@
   <img src="assets/ssh-one-banner.svg" alt="SSH-one — VPN services installer" width="100%">
 </div>
 
-SSH-one installs and manages SSH/VPN services on a VPS. This document describes v26.
+**Release: SSH-one 2.0 v1**
 
 ## Install
 
@@ -43,7 +43,7 @@ For a step-by-step Thai walkthrough, see the [Thai installation guide](docs/inst
 - Option **26** uninstalls SSH-one. Review the summary, back up data, and type <code>UNINSTALL</code> to confirm.
 - Option **27** creates, lists, and deletes API tokens. The default token lifetime is 30 days.
 
-Updates replace only files listed in the managed manifest. They do not automatically update OS packages, service configuration/accounts, or separately downloaded upstream binaries. Uninstall removes some service data; it retains OpenSSH, OS packages, unlabelled firewall rules, and files modified after installation.
+Updates replace files listed in the managed manifest and apply the supported BadVPN/WireGuard game-network migration. They do not update OS packages, other service configuration/accounts, or separately downloaded upstream binaries. Uninstall removes some service data; it retains OpenSSH, OS packages, unlabelled firewall rules, and files modified after installation.
 
 ## Services and default ports
 
@@ -56,7 +56,7 @@ Open required ports in both the VPS firewall and the provider firewall/security 
 | OpenVPN | TCP 1194, UDP 2200, TLS/TCP 990 |
 | SSLH / SSH WebSocket | TCP 443 (TLS multiplex), HTTP 8880 |
 | Stunnel5 | TCP 445, 777, 990 |
-| BadVPN UDPGW | TCP 7100, 7200, 7300 (loopback) |
+| BadVPN UDPGW | TCP 7100, 7200, 7300 (loopback; compatible SSH apps) |
 | WireGuard | UDP 7070 |
 | L2TP/IPsec, PPTP | UDP 500, 1701, 4500; TCP 1732 |
 | SSTP | TCP 444 |
@@ -68,8 +68,16 @@ Open required ports in both the VPS firewall and the provider firewall/security 
 | OHP | TCP 8181, 8282, 8383 |
 | UDP Custom | UDP 1–65535; listener defaults to 36712 |
 
-UDP Custom uses UDP ports 1–65535. The installer opens this range in UFW when UFW is active; allow the ports separately in the VPS provider firewall/security group. Ports 500, 1701, 2200, 4500, and 7070 are excluded by default for other UDP services. The listener defaults to <code>:36712</code> and can be changed from option 1. This binary cannot report connected UDP usernames.
 
+## Games and UDP traffic
+
+SSH ports such as 22 and 443 carry TCP connections. BadVPN UDPGW exposes loopback TCP ports for SSH tunnel apps that implement its UDPGW protocol; it is not a system-wide UDP VPN and cannot carry every game's traffic. For games that need direct UDP, use a WireGuard profile instead of an SSH-only tunnel.
+
+Run `addwg` on the VPS to create a profile. The profile is saved as `/root/wg0-client-NAME.conf` with root-only permissions. Retrieve it over SSH/SCP, import it into the WireGuard app, and activate it. The profile routes IPv4 through the VPS and keeps IPv6 outside the tunnel. UDP 7070 must be allowed in the VPS provider firewall; the installer enables IPv4 forwarding and NAT on the VPS. Do not share a profile: it contains a private key.
+
+To change the WireGuard listener, open `menu` → `Change Port WireGuard`. The script validates and applies the UDP port change, then prints the provider-firewall rule to add.
+
+This improves support for UDP games such as Roblox, whose support documentation lists dynamically selected UDP ports and says experience launch does not support proxies in some managed networks. It cannot guarantee every game or network: provider/ISP UDP filtering, NAT, routing, game policy, anti-cheat, or account restrictions can still prevent a connection. Latency also depends on the route between the player, VPS, and game server.
 ## API for automation
 
 API v1 reads VPS/system/port information and creates, lists, reads, renews, or deletes SSH, UDP Custom, VMess, VLESS, Trojan, and Trojan-Go accounts. Connect through an SSH tunnel to <code>127.0.0.1:8765</code> and send a bearer token with every request. Do not expose the API port publicly or put secrets in a browser.

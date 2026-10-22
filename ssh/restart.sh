@@ -47,7 +47,7 @@ systemctl restart trojan-go
 /etc/init.d/cron restart
 /etc/init.d/nginx restart
 /etc/init.d/squid restart
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7100 --max-clients 1000
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7200 --max-clients 1000
-screen -dmS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 1000
+if [[ -x /usr/bin/ssh-one-game-network ]]; then
+  /usr/bin/ssh-one-game-network restart || echo "Could not restart the BadVPN UDP gateway; run ssh-one-game-network status." >&2
+fi
 echo -e "Restart All Services Successfully"
