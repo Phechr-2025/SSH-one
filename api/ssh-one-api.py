@@ -643,7 +643,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             path=urllib.parse.unquote(parsed.path)
             if not path.startswith(PREFIX): raise ApiError(404,"route not found")
             parts=path[len(PREFIX):].strip("/").split("/") if path[len(PREFIX):].strip("/") else []
-            if self.command=="GET" and parts==["health"]: status,result=200,{"ok":True,"version":"v30"}
+            if self.command=="GET" and parts==["health"]: status,result=200,{"ok":True,"version":"v28"}
             elif self.command=="GET" and parts==["system"]: status,result=200,system_info()
             elif parts and parts[0]=="accounts" and self.command=="GET" and len(parts)==1:
                 service=urllib.parse.parse_qs(parsed.query).get("service",[None])[0]

@@ -9,8 +9,7 @@ ssh/udp-expiry.sh	ssh-one-udp-expiry	0755	shell
 xray/account-tools.sh	ssh-one-xray-accounts	0755	shell
 ssh/autokill.sh	autokill	0755	shell
 ssh/badvpn-udpgw64	badvpn-udpgw	0755	binary
-update/bbr-manager.sh	ssh-one-bbr	0755	shell
-update/bbr2-compat.sh	bbr2	0755	shell
+ssh/bbr2.sh	bbr2	0755	shell
 ssh/ceklim.sh	ceklim	0755	shell
 ssh/cekssh.sh	cekssh	0755	shell
 ssh/changeport.sh	changeport	0755	shell
