@@ -58,7 +58,6 @@ update/running.sh	running	0755	shell
 update/updatemenu.sh	updatemenu	0755	shell
 update/menuinfo.sh	menuinfo	0755	shell
 update/game-network.sh	ssh-one-game-network	0755	shell
-update/ssh-access.sh	ssh-one-ssh-access	0755	shell
 wireguard/expirewg.sh	ssh-one-wireguard-expiry	0755	shell
 update/ssh-one-update.sh	ssh-one-update	0755	shell
 hapus/uninstall	ssh-one-uninstall	0755	shell
